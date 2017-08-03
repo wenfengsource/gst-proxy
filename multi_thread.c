@@ -69,7 +69,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
   		       if (old_state == GST_STATE_READY && new_state == GST_STATE_PAUSED)
   		       {
   		          /* For extra responsiveness, we refresh the GUI as soon as we reach the PAUSED state */
-  		    	   printf("received data from %s \n", gst_ptr->source.src_uri);
+  		    	   printf("received data from sipuri %s \n", gst_ptr->sip_uri);
   		       }
   		    }
   	}
@@ -114,15 +114,19 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
       /* We don't care for messages other than timeouts */
       if (!gst_structure_has_name (st, "GstUDPSrcTimeout"))
     break;
-    g_print ("Timeout received from udpsrc %s\n", gst_ptr->sip_uri);
-    // call thread exit
-//     gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
-//     g_thread_join(gst_ptr->gthread);
-//
-//	if(g_hash_table_remove(gsthashtbale,gst_ptr->sip_uri))
-//	{
-//		printf("remove session successful2 \n");
-//	}
+	g_print ("Timeout received from sipuri %s\n", gst_ptr->sip_uri);
+	//  call thread exit
+	gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
+
+	//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
+	g_main_loop_quit (gst_ptr->loop);
+
+	g_thread_join(gst_ptr->gthread);
+
+	if(g_hash_table_remove(gsthashtbale,gst_ptr->sip_uri))
+	{
+		printf("remove session successful2 \n");
+	}
 
      break;
 
@@ -181,9 +185,9 @@ void cb_udp_client_remove  (GstElement* object, gchararray arg0, gint arg1, gpoi
 
 	  g_object_set (gstcustom->source.src, "timeout",5000000000);
 	  printf("gstcustom->sipuri = %s \n",gstcustom->sip_uri);
-	  g_object_set (gstcustom->source.src, "uri",gstcustom->source.src_uri, NULL);
-	//  g_object_set (gstcustom->source.src, "port", gstcustom->source.port,NULL);
-	 // g_object_set (gstcustom->source.src, "address", "0.0.0.0",NULL);
+	//  g_object_set (gstcustom->source.src, "uri",gstcustom->source.src_uri, NULL);
+      g_object_set (gstcustom->source.src, "port", gstcustom->source.dst_port,NULL);
+	  g_object_set (gstcustom->source.src, "address", "0.0.0.0",NULL);
 	  gstcustom->bus = gst_pipeline_get_bus (GST_PIPELINE (gstcustom->pipeline));
 	  gst_bus_add_signal_watch (gstcustom->bus);
 	  g_signal_connect (G_OBJECT (gstcustom->bus), "message", G_CALLBACK (message_cb), gstcustom);
@@ -200,8 +204,8 @@ void cb_udp_client_remove  (GstElement* object, gchararray arg0, gint arg1, gpoi
 	    gstcustom->sink->sink = gst_element_factory_make ("multiudpsink", "multiudpsink");
 	 //   g_object_set (gstcustom->sink.sink, "host", gstcustom->sink.dst_ip,"port",gstcustom->sink.dst_port, NULL);
 
-
-	 //   g_object_set (gstcustom->sink->sink, "bind-address",gstcustom->sink->src_ip,"bind-port",gstcustom->sink->src_port, NULL);
+         // NAT Tranversl need bind src address ???
+	 // g_object_set (gstcustom->sink->sink, "bind-address",gstcustom->sink->src_ip,"bind-port",gstcustom->sink->src_port, NULL);
 
 	 //   gst_object_unref(templ);
 	//    port += 1;
@@ -361,8 +365,10 @@ cb_have_data (GstPad    *pad,
 		unsigned char tx_buf[1500];
 
 
-		int src_type = 0, sink_type = 0, invite_flag =0, bye_flag = 0, sink_dst_port= 0, sink_src_port = 0, sink_keep_alive_flag=0;
-		char src_uri[30], sink_dst_uri[30], sink_dst_ip[30];
+		int src_type = 0, sink_type = 0, invite_flag =0, bye_flag = 0, 	sink_keep_alive_flag=0, source_keep_alive_flag =0,
+				sink_dst_port= 0, sink_src_port = 0,source_src_port =0, source_dst_port=0;
+
+		char src_uri[30], sink_dst_uri[30], sink_dst_ip[20], sink_src_ip[20], source_src_ip[20],source_dst_ip[20];
 		char gst_hashtable_key[50], sipuri[50], callid[50];
 
 
@@ -462,21 +468,43 @@ cb_have_data (GstPad    *pad,
 		bye_flag    =  bye_parse(rx_buf, rcv_size);
 		src_type = src_type_parse(rx_buf, rcv_size);
 		sink_type =  sink_type_parse(rx_buf, rcv_size);
+
 		sink_src_port =  sink_src_port_parse(rx_buf, rcv_size);
+		sink_dst_port =  sink_dst_port_parse(rx_buf, rcv_size);
+		source_src_port = source_src_port_parse(rx_buf, rcv_size);
+		source_dst_port = source_dst_port_parse(rx_buf, rcv_size);
+
+
 		sink_keep_alive_flag = sink_keep_alive_parse(rx_buf, rcv_size);
 
-		if(src_uri_parse(rx_buf, rcv_size, src_uri) == 0)
+//		if(src_uri_parse(rx_buf, rcv_size, src_uri) == 0)
+//		{
+//			printf("not find src_uri \n");
+//			continue;
+//		}
+//
+		if(sink_dst_ip_parse(rx_buf, rcv_size,sink_dst_ip) == 0)
 		{
-			printf("not find src_uri \n");
+			printf("not find sink_dst_ip \n");
 			continue;
 		}
 
-		if(sink_dst_uri_parse(rx_buf, rcv_size,sink_dst_ip, &sink_dst_port) == 0)
+		if(sink_src_ip_parse(rx_buf, rcv_size,sink_src_ip) == 0)
 		{
-			printf("not find sink_dst_uri \n");
-			continue;
+			printf("not find sink_dst_ip \n");
+		//	continue;
 		}
 
+		if(source_src_ip_parse(rx_buf, rcv_size,source_src_ip) == 0)
+		{
+			printf("not find sink_dst_ip \n");
+		//	continue;
+		}
+		if(source_dst_ip_parse(rx_buf, rcv_size,source_dst_ip) == 0)
+		{
+			printf("not find sink_dst_ip \n");
+		//	continue;
+		}
 
 
        // sleep(1);
@@ -517,7 +545,11 @@ cb_have_data (GstPad    *pad,
 							 g_stpcpy(sink->callid, callid);
 							 g_stpcpy(sink->sipuri, sipuri);
 
-							 sink->snd_port = sink_src_port;
+							 g_stpcpy(sink->src_ip, sink_src_ip);
+							 g_stpcpy(sink->dst_ip, sink_dst_ip);
+							 sink->src_port = sink_src_port;
+							 sink->dst_port = sink_dst_port;
+
 							 sink->keep_alive_flag = sink_keep_alive_flag;
 
 							 create_keep_alive_socket_rcv_source(sink);
@@ -526,8 +558,7 @@ cb_have_data (GstPad    *pad,
 
 							 printf("sink_hashtable  %d \n", g_hash_table_size(tmp->sink_hashtable));
 
-							 g_stpcpy(sink->dst_ip, sink_dst_ip);
-							 sink->dst_port = sink_dst_port;
+
 							 tmp->sink = sink;
 
 
@@ -563,7 +594,17 @@ cb_have_data (GstPad    *pad,
 					 gst_ptr->sink = g_new0(Sink, 1);
 					 g_stpcpy(gst_ptr->sink->callid, callid);
 					 g_stpcpy(gst_ptr->sink->sipuri, sipuri);
-					 gst_ptr->sink->snd_port = sink_src_port;
+
+					 g_stpcpy(gst_ptr->sink->src_ip, sink_src_ip);
+					 g_stpcpy(gst_ptr->sink->dst_ip, sink_dst_ip);
+					 gst_ptr->sink->src_port = sink_src_port;
+					 gst_ptr->sink->dst_port = sink_dst_port;
+
+					 g_stpcpy(gst_ptr->source.src_ip, source_src_ip);
+					 g_stpcpy(gst_ptr->source.dst_ip, source_dst_ip);
+					 gst_ptr->source.src_port = source_src_port;
+					 gst_ptr->source.dst_port = source_dst_port;
+
 					 gst_ptr->sink->keep_alive_flag = sink_keep_alive_flag;
 
 					 create_keep_alive_socket_rcv_source(gst_ptr->sink);
@@ -573,10 +614,7 @@ cb_have_data (GstPad    *pad,
 
 					 printf("sink_hashtable  %d \n", g_hash_table_size(gst_ptr->sink_hashtable));
 
-					 g_stpcpy(gst_ptr->sink->dst_ip, sink_dst_ip);
-					 gst_ptr->sink->dst_port = sink_dst_port;
-
-					 // create address table
+	 			 // create address table
 //					 gst_ptr->sink->hashtb_address = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value);
 //					 gst_ptr->sink->sinkaddress = g_new0(SinkAddress, 1);
 //					 g_hash_table_insert (gst_ptr->sink->hashtb_address, g_strdup(callid),  gst_ptr->sink->sinkaddress);
@@ -591,6 +629,8 @@ cb_have_data (GstPad    *pad,
 					// char dst_uri[50];
 					// sprintf(dst_uri,"%s:%d",sink_dst_ip,sink_dst_port);
 					 //gst_ptr->sink->Address_list = g_list_append(gst_ptr->sink->Address_list, dst_uri);
+
+
 
 					 gst_ptr->gthread  = g_thread_new("jieshouip:port", new_pipeline_thread , gst_ptr);
 				}
@@ -660,13 +700,13 @@ cb_have_data (GstPad    *pad,
 
 									// if need check ref count need check ,
 //									printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
-//								    gst_object_unref (sink->queue);
+// 								    gst_object_unref (sink->queue);
 //									gst_object_unref (sink->sink);
 //								    printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 
 									gst_element_set_state(GST_ELEMENT (tmp->pipeline),GST_STATE_NULL);
 									printf("set status to NUll \n");
-									//sleep(1);
+									 //sleep(1);
 
 									rmv_keepalive_socket_rcv_source(sink);
 
@@ -749,6 +789,13 @@ cb_have_data (GstPad    *pad,
 
 }
 
+ void free_all_keepalive_socket_rcv_source(gpointer key, gpointer value, gpointer user_data)
+ {
+     printf("free all keep alive source \n");
+     rmv_keepalive_socket_rcv_source(value);
+ }
+
+
  void *new_pipeline_thread( gpointer *arg)
  {
 	GstCustom *gstdata;
@@ -756,6 +803,9 @@ cb_have_data (GstPad    *pad,
 	// gst_init (NULL, NULL);
 	gstdata->loop =  g_main_loop_new (NULL, FALSE);
 	printf("create new thread for new pipeline\n");
+
+
+	create_source_snd_keep_alive(gstdata);
 
 	Create_udptoudp_Pipeline(gstdata);
 
@@ -767,8 +817,13 @@ cb_have_data (GstPad    *pad,
 	g_main_loop_unref (gstdata->loop);
 	gst_object_unref (gstdata->pipeline);
 
+	g_hash_table_foreach(gstdata->sink_hashtable, free_all_keepalive_socket_rcv_source, NULL);
+	//rmv_keepalive_socket_rcv_source(gstdata->sink);
 
-    printf("exit %s \n", gstdata->sip_uri);
+    printf("exit thread sipuri  %s \n", gstdata->sip_uri);
+
+
+     rmv_keepalive_socket_snd_source(gstdata);
 
 	 //end thread, destory hash table
 
@@ -870,7 +925,7 @@ void *keep_alive_thread( gpointer *arg)
 
      GError *error = NULL;
      memset(buf,0,100);
-
+     gchar *str;
      printf("task callback \n");
    //  g_io_channel_read_chars(channel,buf, 100,&len, error);
    //   g_io_channel_read (channel,buf, 100,&len);//, error);
@@ -893,7 +948,10 @@ void *keep_alive_thread( gpointer *arg)
      GInetAddress *addr = g_inet_socket_address_get_address(G_INET_SOCKET_ADDRESS(src_address));
        guint16 port = g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(src_address));
 
-       g_print("New Connection from %s:%d\n", g_inet_address_to_string(addr), port);
+       str = g_inet_address_to_string(addr);
+       g_print("New Connection from %s:%d\n",str , port);
+
+       g_free(str);
 
     if (len < 0)
   	{
@@ -991,7 +1049,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 
      	printf(" sipuri %s, callid %s not receive keeplive \n", sink->sipuri,sink->callid);
 
-
+            // need add mutex
      	GstCustom *tmp = g_hash_table_lookup (gsthashtbale, sink->sipuri);
 
 		if(tmp != 0)  // src session is builded
@@ -1159,7 +1217,71 @@ keep_alive_timed_out_cb (GSocket      *client,
 
 	printf("remove callid keep alive %s \n", sink->callid );
 	g_socket_close( sink->sndkeepalive_socket, NULL);
+
+	g_object_unref(sink->sndkeepalive_socket);
 	g_source_remove( sink->sourceid);
+	sink->keep_alive_flag = FALSE;
+
+ }
+
+
+ void senddatacb(GSocketAddress *add)
+ {
+	 GError *err = NULL;
+	  g_socket_send_to (sock,add ,
+	  "helloword", 9,  NULL, &err);
+ }
+
+
+ void create_source_snd_keep_alive(GstCustom *gstptr)
+ {
+	 if(gstptr->source.keep_alive_flag == FALSE)
+	 {
+		  return;
+	 }
+
+	 GError *err = NULL;
+	 GSource *source;
+	 gboolean flag;
+	 printf("socket create \n");
+	 sock = g_socket_new(G_SOCKET_FAMILY_IPV4,
+               G_SOCKET_TYPE_DATAGRAM,
+               G_SOCKET_PROTOCOL_UDP,
+               &err);
+	 printf("socket create111 \n");
+		g_assert(err == NULL);
+
+	//	g_socket_connect(gstptr->source->sndkeepalive_socket,
+	//			G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string("192.168.128.151") ,5555)),
+	//			NULL, &err);
+
+	 //   printf("sink snd_port %d \n ", sink->snd_port);
+//		flag= g_socket_bind(sock,
+//		 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string("192.168.128.152") ,1029)),
+//		 	              TRUE,
+//		 	              &err);
+//		printf("flag = %d\n", flag);
+
+	//   g_printerr ("ERROR:  %s\n", err->message);
+		//g_assert(err == NULL);
+
+	 GSocketAddress *add= G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(gstptr->source.src_ip) ,gstptr->source.src_port));
+
+	gstptr->source.timesourceid = g_timeout_add_seconds(3,senddatacb,add);
+
+ }
+
+ void rmv_keepalive_socket_snd_source( GstCustom *gstptr)
+ {
+	 if(gstptr->source.keep_alive_flag == FALSE)
+		 return;
+
+	printf("remove sipuri keep alive %s \n", gstptr->sip_uri);
+	g_socket_close( gstptr->source.sndkeepalive_socket, NULL);
+
+	g_object_unref(gstptr->source.sndkeepalive_socket);
+	g_source_remove( gstptr->source.timesourceid);
+	gstptr->source.keep_alive_flag = FALSE;
 
  }
 

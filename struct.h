@@ -62,7 +62,7 @@ typedef struct
   int type;  // UDP/RTP/TCP
 
   GSocket *sndkeepalive_socket;
-  guint sourceid;
+  guint sourceid;   // detect keep_alive source id
   int Nat_Traversal;  // NAT
   //GHashTable Multi_Address; //  address as key, keep_live as value
 
@@ -75,10 +75,15 @@ typedef struct
 	GstElement *src;
 	GstElement *tee;
 
-    char ip[20];
-    int port;
+    char dst_ip[20];
+    char src_ip[20];
+    int dst_port;
+    int src_port;
+    GSocket *sndkeepalive_socket;
+    guint timesourceid;
     char src_uri[50];
-    int snd_beatheart;
+    int keep_alive_flag;
+  //  int snd_beatheart;
     int type;   // TCP/RTP/UDP
 }Source;
 
@@ -96,12 +101,5 @@ typedef struct
 
 
 } GstCustom;
-
-typedef struct
-{
-	GstCustom  *GstCusom;
-	Sink *sink;
-
-}userpoint;
 
 #endif

@@ -241,6 +241,115 @@ int sink_src_port_parse(char *buff, int len)
 	return  atoi(type);
 }
 
+
+int sink_dst_port_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sinkdstport=", 12) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+12;
+			 printf("find sinkdstport=true \n");
+		//	 return TRUE;
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			//return 1;
+			 break;
+		}
+
+		if(flag == 1)
+		{
+			type[j++] = buff[i];
+
+		}
+
+	}
+	return  atoi(type);
+}
+
+int source_dst_port_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sourcedstport=", 14) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+14;
+			 printf("find sourcedstport=true \n");
+		//	 return TRUE;
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			//return 1;
+			 break;
+		}
+
+		if(flag == 1)
+		{
+			type[j++] = buff[i];
+
+		}
+
+	}
+	return  atoi(type);
+}
+
+int source_src_port_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sourcesrcport=", 14) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+14;
+			 printf("find sinkdstport=true \n");
+		//	 return TRUE;
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			//return 1;
+			 break;
+		}
+
+		if(flag == 1)
+		{
+			type[j++] = buff[i];
+
+		}
+
+	}
+	return  atoi(type);
+}
+
 int sink_keep_alive_parse(char *buff, int len)
 {
 	int i=0, j=0;
@@ -400,6 +509,155 @@ int sink_dst_uri_parse(char *buff, int len, char *dst_ip, int *dst_port)
 				port[k++] = buff[i+1];
 			}
 
+		}
+
+	}
+	return 0;
+//	return  atoi(type);
+}
+
+int sink_dst_ip_parse(char *buff, int len, char *dst_ip)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char port[6];
+    int maohaoflag = 0;
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sinkdstip=", 10) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+10;
+			 printf("find sinkdstip \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			return 1;
+            break;
+
+		}
+
+		if(flag == 1)
+		{
+			dst_ip[j++] = buff[i];
+		}
+
+	}
+	return 0;
+//	return  atoi(type);
+}
+
+int sink_src_ip_parse(char *buff, int len, char *dst_ip)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char port[6];
+    int maohaoflag = 0;
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sinksrcip=", 10) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+10;
+			 printf("find sinksrcip \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			return 1;
+            break;
+
+		}
+
+		if(flag == 1)
+		{
+			dst_ip[j++] = buff[i];
+		}
+
+	}
+	return 0;
+//	return  atoi(type);
+}
+
+int source_src_ip_parse(char *buff, int len, char *dst_ip)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char port[6];
+    int maohaoflag = 0;
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sourcesrcip=", 12) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+10;
+			 printf("find sourcesrcip \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			return 1;
+            break;
+
+		}
+
+		if(flag == 1)
+		{
+			dst_ip[j++] = buff[i];
+		}
+
+	}
+	return 0;
+//	return  atoi(type);
+}
+
+
+int source_dst_ip_parse(char *buff, int len, char *dst_ip)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char port[6];
+    int maohaoflag = 0;
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sourcedstip=", 12) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+10;
+			 printf("find sourcedstip \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			return 1;
+            break;
+
+		}
+
+		if(flag == 1)
+		{
+			dst_ip[j++] = buff[i];
 		}
 
 	}
