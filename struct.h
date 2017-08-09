@@ -58,12 +58,13 @@ typedef struct
  // SinkAddress *sinkaddress;
 
   //Heatbeat  rcv_beatheart;
-  int snd_port;
+ // int snd_port;
   int type;  // UDP/RTP/TCP
 
   GSocket *sndkeepalive_socket;
   guint sourceid;   // detect keep_alive source id
   int Nat_Traversal;  // NAT
+  int Get_Nat_address_flag;
   //GHashTable Multi_Address; //  address as key, keep_live as value
 
   //GList *Address_list;
@@ -80,6 +81,9 @@ typedef struct
     int dst_port;
     int src_port;
     GSocket *sndkeepalive_socket;
+
+    GSocketAddress *address;
+
     guint timesourceid;
     char src_uri[50];
     int keep_alive_flag;

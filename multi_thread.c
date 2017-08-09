@@ -1,6 +1,6 @@
 #include <string.h>
 #include <gst/gst.h>
-
+#include <stdio.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 
@@ -15,21 +15,32 @@
 #include "hashtable.h"
 #include "struct.h"
 
-#define LOCAL_IP   "192.168.168.152"
+
 #define UDP    1
 #define RTP    2
 #define TCP    3
 
 
 #define  RCV_PORT_MIN   60000
-#define  RCV_PORT_MAX   61000
-#define  SND_PORT_MIN   60000
-#define  SND_PORT_MAX   61000
+#define  RCV_PORT_MAX   62000
+#define  SND_PORT_MIN   62002
+#define  SND_PORT_MAX   64000
 #define  PORT_STEP      2
 
 static int Cur_Rcv_Port=60000;
-static int Cur_Snd_Port=60000;
+static int Cur_Snd_Port=62002;
+static char g_remote_ip[20];
 
+static char g_nat_ip[20];
+static char g_rcv_ip[20];
+static char g_snd_ip[20];
+
+#define LOCAL_IP   g_rcv_ip
+
+unsigned char tx_buf[1500];
+unsigned char rx_buf[1500];
+
+int cnt;
 
 GHashTable *Hashtbl_Cur_Rcv_Port; // sipuri and port
 GHashTable *Hashtbl_Cur_Snd_Port; // callid and port
@@ -47,6 +58,8 @@ int fd;
 
 void *new_pipeline_thread( gpointer *arg);
 void add_source(GMainContext *context);
+void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data);
+
 
 static gboolean
 message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
@@ -54,6 +67,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 	GstCustom *gst_ptr;
 	gst_ptr = (GstCustom*)user_data;
 	//printf("message cb %s \n", ptr->sipui);
+
 
 	const GstStructure *st = gst_message_get_structure (message);
 
@@ -70,6 +84,10 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
   		       {
   		          /* For extra responsiveness, we refresh the GUI as soon as we reach the PAUSED state */
   		    	   printf("received data from sipuri %s \n", gst_ptr->sip_uri);
+
+  		    	  bzero(tx_buf,sizeof(tx_buf));
+  		    	  sprintf(tx_buf, "sipuri=%s;getdata=true;",gst_ptr->sip_uri);
+  		    	 send_packet(tx_buf,strlen(tx_buf),g_remote_ip);
   		       }
   		    }
   	}
@@ -109,14 +127,19 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
       break;
     }
     case GST_MESSAGE_ELEMENT:
-
+     // need remove, this is only used for comment stop pipeline
+    //	break;
     	 // g_print ("Timeout \n");
       /* We don't care for messages other than timeouts */
       if (!gst_structure_has_name (st, "GstUDPSrcTimeout"))
     break;
 	g_print ("Timeout received from sipuri %s\n", gst_ptr->sip_uri);
+
+	 bzero(tx_buf,sizeof(tx_buf));
+	 sprintf(tx_buf,"sipuri=%s;getdata=false;",gst_ptr->sip_uri);
+	 send_packet(tx_buf,strlen(tx_buf),g_remote_ip);
 	//  call thread exit
-	gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
+ 	gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
 
 	//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 	g_main_loop_quit (gst_ptr->loop);
@@ -183,11 +206,28 @@ void cb_udp_client_remove  (GstElement* object, gchararray arg0, gint arg1, gpoi
 
 	  //loop = g_main_loop_new (NULL, FALSE);
 
+
 	  g_object_set (gstcustom->source.src, "timeout",5000000000);
+
+
 	  printf("gstcustom->sipuri = %s \n",gstcustom->sip_uri);
+
+	  // need keep alive
+	  if(gstcustom->source.keep_alive_flag == FALSE)
+	  {
+		  printf("config udpsrc socket \n");
 	//  g_object_set (gstcustom->source.src, "uri",gstcustom->source.src_uri, NULL);
-      g_object_set (gstcustom->source.src, "port", gstcustom->source.dst_port,NULL);
-	  g_object_set (gstcustom->source.src, "address", "0.0.0.0",NULL);
+          g_object_set (gstcustom->source.src, "port", gstcustom->source.dst_port,NULL);
+       	  g_object_set (gstcustom->source.src, "address", "0.0.0.0",NULL);
+       	  // Disabling this might result in minor performance improvements
+       	   g_object_set (gstcustom->source.src, "retrieve-sender-address", FALSE,NULL);
+	  }
+	  else
+	  {
+		  g_object_set (gstcustom->source.src, "socket",gstcustom->source.sndkeepalive_socket, NULL);
+		  g_object_set (gstcustom->source.src, "close-socket", FALSE,NULL);
+	  }
+
 	  gstcustom->bus = gst_pipeline_get_bus (GST_PIPELINE (gstcustom->pipeline));
 	  gst_bus_add_signal_watch (gstcustom->bus);
 	  g_signal_connect (G_OBJECT (gstcustom->bus), "message", G_CALLBACK (message_cb), gstcustom);
@@ -209,8 +249,11 @@ void cb_udp_client_remove  (GstElement* object, gchararray arg0, gint arg1, gpoi
 
 	 //   gst_object_unref(templ);
 	//    port += 1;
-
-
+        if(gstcustom->sink->sndkeepalive_socket != NULL)
+        {
+			g_object_set (gstcustom->sink->sink, "socket",  gstcustom->sink->sndkeepalive_socket , NULL);
+			g_object_set (gstcustom->sink->sink, "close-socket",  FALSE , NULL);    //stop pipeline not close socket
+        }
 	    g_object_set (gstcustom->sink->sink, "send-duplicates", FALSE, NULL);
 
 	    g_signal_connect (gstcustom->sink->sink, "client-added",G_CALLBACK (cb_udp_client_add), gstcustom);
@@ -268,6 +311,12 @@ int Add_udpsink_to_udpudp_pipeline(GstCustom *gstcustom, Sink *sink)
 		//   gst_object_unref(templ);
 		//    port += 1;
 
+        if(sink->sndkeepalive_socket != NULL)
+        {
+			g_object_set (sink->sink, "socket", sink->sndkeepalive_socket , NULL);
+			g_object_set (sink->sink, "close-socket",  FALSE , NULL);    //set element to NULL, not close socket
+        }
+
 		g_object_set (sink->sink, "send-duplicates", FALSE, NULL);
 
 		g_signal_connect (sink->sink, "client-added",G_CALLBACK (cb_udp_client_add), gstcustom);
@@ -295,9 +344,6 @@ int Add_udpsink_to_udpudp_pipeline(GstCustom *gstcustom, Sink *sink)
 
 	   // create_keep_alive_socket_rcv_source();
 }
-
-
-
 
 
 static GstPadProbeReturn
@@ -355,18 +401,15 @@ cb_have_data (GstPad    *pad,
 	 int rcv_size;
 	 GstCustom *gst_ptr;
 	signal(SIGINT, Stop);
-
+	char remote_ip[20];
 	printf("cmd thread created \n");
 	gRcvSocket = rcv_socket_init();
+	gSndSocket = snd_socket_init();
 	while(1)
 	{
 
-		unsigned char rx_buf[1500];
-		unsigned char tx_buf[1500];
-
-
 		int src_type = 0, sink_type = 0, invite_flag =0, bye_flag = 0, 	sink_keep_alive_flag=0, source_keep_alive_flag =0,
-				sink_dst_port= 0, sink_src_port = 0,source_src_port =0, source_dst_port=0;
+				sink_dst_port= 0, sink_src_port = 0,source_src_port =0, source_dst_port=0, NAT_Flag = 0;
 
 		char src_uri[30], sink_dst_uri[30], sink_dst_ip[20], sink_src_ip[20], source_src_ip[20],source_dst_ip[20];
 		char gst_hashtable_key[50], sipuri[50], callid[50];
@@ -374,7 +417,24 @@ cb_have_data (GstPad    *pad,
 
 		printf("receive data \n");
 		memset(rx_buf, 0 ,1500);
+		memset(tx_buf, 0 ,1500);
 		rcv_size = receive_packet(rx_buf);
+
+		if(remote_ip_parse(rx_buf,rcv_size, remote_ip))
+		{
+			printf("remote ip = %s \n",remote_ip);
+		    g_stpcpy(g_remote_ip, remote_ip);
+			continue;
+		}
+
+		if(get_total_session(rx_buf,rcv_size) == 1 && gsthashtbale !=NULL)
+		{
+			cnt = 0;
+			g_hash_table_foreach(gsthashtbale, foreach_gst_hashtab, NULL);
+
+			printf("tx_buf  %s \n", tx_buf);
+			send_packet(tx_buf, strlen(tx_buf), g_remote_ip) ;
+		}
 
 		memset(sipuri, 0 ,50);
 		if(sipuri_parse(rx_buf,rcv_size,sipuri) == 0)
@@ -390,7 +450,7 @@ cb_have_data (GstPad    *pad,
 			continue;
 		}
 
-		if(request_address()  == 1)
+		if(request_address(rx_buf,rcv_size)  == 1)
 		{
 			//snd address to request
 			char *ptr;
@@ -429,6 +489,7 @@ cb_have_data (GstPad    *pad,
 
 				}
 			}
+
 		    g_hash_table_insert ( Hashtbl_Cur_Rcv_Port, g_strdup(str), g_strdup(sipuri));
 
 
@@ -460,6 +521,8 @@ cb_have_data (GstPad    *pad,
 			}
 		    g_hash_table_insert ( Hashtbl_Cur_Snd_Port, g_strdup(str), g_strdup(callid));
 
+		    sprintf(tx_buf,"sipuri=%s;callid=%s;sourcedstip=%s;sourcedstport=%d;sinksrcip=%s;sinksrcport=%d",sipuri,callid,g_nat_ip,Cur_Rcv_Port,g_nat_ip,Cur_Snd_Port);
+		    send_packet(tx_buf,strlen(tx_buf),g_remote_ip);
 			//if()
 			continue;
 		}
@@ -471,11 +534,21 @@ cb_have_data (GstPad    *pad,
 
 		sink_src_port =  sink_src_port_parse(rx_buf, rcv_size);
 		sink_dst_port =  sink_dst_port_parse(rx_buf, rcv_size);
+//		if(sink_dst_port ==0)
+//		{
+//			continue;
+//		}
 		source_src_port = source_src_port_parse(rx_buf, rcv_size);
 		source_dst_port = source_dst_port_parse(rx_buf, rcv_size);
-
+        if(source_dst_port ==0 && invite_flag == 1)
+        {
+        	printf("not find source_dst_port \n");
+        	continue;
+        }
 
 		sink_keep_alive_flag = sink_keep_alive_parse(rx_buf, rcv_size);
+		source_keep_alive_flag = source_keep_alive_parse(rx_buf, rcv_size);
+		NAT_Flag = Nat_parse(rx_buf, rcv_size);
 
 //		if(src_uri_parse(rx_buf, rcv_size, src_uri) == 0)
 //		{
@@ -483,28 +556,29 @@ cb_have_data (GstPad    *pad,
 //			continue;
 //		}
 //
-		if(sink_dst_ip_parse(rx_buf, rcv_size,sink_dst_ip) == 0)
+		if((invite_flag ==1) && (sink_dst_ip_parse(rx_buf, rcv_size,sink_dst_ip) == 0))
 		{
 			printf("not find sink_dst_ip \n");
 			continue;
 		}
 
-		if(sink_src_ip_parse(rx_buf, rcv_size,sink_src_ip) == 0)
-		{
-			printf("not find sink_dst_ip \n");
-		//	continue;
-		}
+//		if((invite_flag ==1) && (sink_src_ip_parse(rx_buf, rcv_size,sink_src_ip) == 0))
+//		{
+//			printf("not find sink_src_ip \n");
+//
+//		}
 
-		if(source_src_ip_parse(rx_buf, rcv_size,source_src_ip) == 0)
+		if((source_keep_alive_flag == 1) && (source_src_ip_parse(rx_buf, rcv_size,source_src_ip) == 0))
 		{
-			printf("not find sink_dst_ip \n");
-		//	continue;
+
+			printf("snd keep alive need source src ip \n");
+			continue;
 		}
-		if(source_dst_ip_parse(rx_buf, rcv_size,source_dst_ip) == 0)
-		{
-			printf("not find sink_dst_ip \n");
-		//	continue;
-		}
+//		if(source_dst_ip_parse(rx_buf, rcv_size,source_dst_ip) == 0)
+//		{
+//			printf("not find source_dst_ip \n");
+//
+//		}
 
 
        // sleep(1);
@@ -522,7 +596,7 @@ cb_have_data (GstPad    *pad,
 				if(tmp != 0)  // src session id is esstibition
 				{
 					printf("find %s \n", sipuri);
-					if(sink_type == 1)
+					if(sink_type == UDP)
 					{
 
 						//sink = g_hash_table_lookup (tmp->sink_hashtable, "UDP");
@@ -549,7 +623,10 @@ cb_have_data (GstPad    *pad,
 							 g_stpcpy(sink->dst_ip, sink_dst_ip);
 							 sink->src_port = sink_src_port;
 							 sink->dst_port = sink_dst_port;
-
+							 sink->type = sink_type;
+							 printf("sink->dst_port = %d \n", sink->dst_port);
+							 sink->Nat_Traversal = NAT_Flag;
+							 sink->Get_Nat_address_flag = FALSE;
 							 sink->keep_alive_flag = sink_keep_alive_flag;
 
 							 create_keep_alive_socket_rcv_source(sink);
@@ -578,61 +655,89 @@ cb_have_data (GstPad    *pad,
 							// sink->Address_list = g_list_append(sink->Address_list, dst_uri);
 						}
 					}
+					else if(sink_type ==RTP)
+					{
+
+					}
+					else if(sink_type == TCP)  // TCP output
+					{
+
+					}
 				}
 				else     // src session is not build, create new pipeline
 				{
-				   // check udp type src pipeline if is created
-					 printf("create pipeline \n");
-					 GstCustom *gst_ptr = g_new0(GstCustom, 1);
-					// sprintf(gst_ptr->sip_uri,"udp://%s",src_uri);
-					// gst_ptr->source.src_uri = g_strdup_printf("udp://%s",src_uri);
-					 g_stpcpy(gst_ptr->sip_uri, sipuri);
-					 sprintf(gst_ptr->source.src_uri,"udp://%s",src_uri);
-					 g_hash_table_insert (gsthashtbale,  g_strdup(gst_ptr->sip_uri), gst_ptr);
+					if(sink_type == UDP)
+					{
+					   // check udp type src pipeline if is created
+						 printf("create pipeline \n");
+						 GstCustom *gst_ptr = g_new0(GstCustom, 1);
+						// sprintf(gst_ptr->sip_uri,"udp://%s",src_uri);
+						// gst_ptr->source.src_uri = g_strdup_printf("udp://%s",src_uri);
+						 g_stpcpy(gst_ptr->sip_uri, sipuri);
+						// sprintf(gst_ptr->source.src_uri,"udp://%s",src_uri);
+						 g_hash_table_insert (gsthashtbale,  g_strdup(gst_ptr->sip_uri), gst_ptr);
 
-					 printf("Create sink \n");
-					 gst_ptr->sink = g_new0(Sink, 1);
-					 g_stpcpy(gst_ptr->sink->callid, callid);
-					 g_stpcpy(gst_ptr->sink->sipuri, sipuri);
+						 printf("Create sink \n");
+						 gst_ptr->sink = g_new0(Sink, 1);
+						 g_stpcpy(gst_ptr->sink->callid, callid);
+						 g_stpcpy(gst_ptr->sink->sipuri, sipuri);
 
-					 g_stpcpy(gst_ptr->sink->src_ip, sink_src_ip);
-					 g_stpcpy(gst_ptr->sink->dst_ip, sink_dst_ip);
-					 gst_ptr->sink->src_port = sink_src_port;
-					 gst_ptr->sink->dst_port = sink_dst_port;
+						 g_stpcpy(gst_ptr->sink->src_ip, sink_src_ip);
+						 g_stpcpy(gst_ptr->sink->dst_ip, sink_dst_ip);
+						 gst_ptr->sink->src_port = sink_src_port;
+						 gst_ptr->sink->dst_port = sink_dst_port;
+						 gst_ptr->sink->type = sink_type;
+						 gst_ptr->source.type = src_type;
 
-					 g_stpcpy(gst_ptr->source.src_ip, source_src_ip);
-					 g_stpcpy(gst_ptr->source.dst_ip, source_dst_ip);
-					 gst_ptr->source.src_port = source_src_port;
-					 gst_ptr->source.dst_port = source_dst_port;
+						 printf("gst_ptr.sink->dst_port = %d \n", gst_ptr->sink->dst_port);
 
-					 gst_ptr->sink->keep_alive_flag = sink_keep_alive_flag;
+						 g_stpcpy(gst_ptr->source.src_ip, source_src_ip);
+						 g_stpcpy(gst_ptr->source.dst_ip, source_dst_ip);
+						 gst_ptr->source.src_port = source_src_port;
+						 gst_ptr->source.dst_port = source_dst_port;
 
-					 create_keep_alive_socket_rcv_source(gst_ptr->sink);
+						 gst_ptr->sink->Nat_Traversal = NAT_Flag;
+						 gst_ptr->sink->Get_Nat_address_flag = FALSE;
+						 gst_ptr->sink->keep_alive_flag = sink_keep_alive_flag;
+						 gst_ptr->source.keep_alive_flag = source_keep_alive_flag;
+						 create_keep_alive_socket_rcv_source(gst_ptr->sink);
 
-					 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value );
-					 g_hash_table_insert (gst_ptr->sink_hashtable, g_strdup(callid), gst_ptr->sink);
-
-					 printf("sink_hashtable  %d \n", g_hash_table_size(gst_ptr->sink_hashtable));
-
-	 			 // create address table
-//					 gst_ptr->sink->hashtb_address = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value);
-//					 gst_ptr->sink->sinkaddress = g_new0(SinkAddress, 1);
-//					 g_hash_table_insert (gst_ptr->sink->hashtb_address, g_strdup(callid),  gst_ptr->sink->sinkaddress);
-//
-//					 g_stpcpy(gst_ptr->sink->sinkaddress->dst_ip, sink_dst_ip);
-//					 gst_ptr->sink->sinkaddress->dst_port = sink_dst_port;
-
-					 // store dst address to glist
-					 //gst_ptr->sink->dst_ip = g_strdup_printf("udp://%s",sink_dst_uri);
-					// g_stpcpy(gst_ptr->sink->dst_ip, sink_dst_ip);
-					// gst_ptr->sink->dst_port = sink_dst_port;
-					// char dst_uri[50];
-					// sprintf(dst_uri,"%s:%d",sink_dst_ip,sink_dst_port);
-					 //gst_ptr->sink->Address_list = g_list_append(gst_ptr->sink->Address_list, dst_uri);
+						 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value );
 
 
+						 g_hash_table_insert (gst_ptr->sink_hashtable, g_strdup(callid), gst_ptr->sink);
 
-					 gst_ptr->gthread  = g_thread_new("jieshouip:port", new_pipeline_thread , gst_ptr);
+						 printf("sink_hashtable  %d \n", g_hash_table_size(gst_ptr->sink_hashtable));
+
+					 // create address table
+	//					 gst_ptr->sink->hashtb_address = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value);
+	//					 gst_ptr->sink->sinkaddress = g_new0(SinkAddress, 1);
+	//					 g_hash_table_insert (gst_ptr->sink->hashtb_address, g_strdup(callid),  gst_ptr->sink->sinkaddress);
+	//
+	//					 g_stpcpy(gst_ptr->sink->sinkaddress->dst_ip, sink_dst_ip);
+	//					 gst_ptr->sink->sinkaddress->dst_port = sink_dst_port;
+
+						 // store dst address to glist
+						 //gst_ptr->sink->dst_ip = g_strdup_printf("udp://%s",sink_dst_uri);
+						// g_stpcpy(gst_ptr->sink->dst_ip, sink_dst_ip);
+						// gst_ptr->sink->dst_port = sink_dst_port;
+						// char dst_uri[50];
+						// sprintf(dst_uri,"%s:%d",sink_dst_ip,sink_dst_port);
+						 //gst_ptr->sink->Address_list = g_list_append(gst_ptr->sink->Address_list, dst_uri);
+
+
+
+						 gst_ptr->gthread  = g_thread_new("jieshouip:port", new_pipeline_thread , gst_ptr);
+
+					}
+					else if(sink_type == RTP)
+					{
+
+					}
+					else if(sink_type == TCP)
+					{
+
+					}
 				}
 //
 //				gst_ptr = g_hash_table_lookup (ghashtbale, strdup("sipui"));
@@ -645,15 +750,22 @@ cb_have_data (GstPad    *pad,
 //					printf("not find sipui \n");
 			}
  				break;
+
+			case RTP:
+				break;
+
+			case TCP:
+				break;
+
 			default:
 				break;
 			}
 		}
 		else if(bye_flag == TRUE)
 		{
-			switch(src_type)
+			//switch(src_type)
 			{
-			case UDP:  //udp type src
+		//	case UDP:  //udp type src
 				{
 				//sprintf(gst_hashtable_key,"udp://%s",src_uri);
 				GstCustom *tmp = g_hash_table_lookup (gsthashtbale, sipuri);
@@ -661,7 +773,7 @@ cb_have_data (GstPad    *pad,
 				if(tmp != 0)  // src session is builded
 				{
 					printf("finded %s \n", sipuri);
-					if(sink_type == UDP)
+				//	if(sink_type == UDP)
 					{
 						Sink *sink;
 					//	printf("remove sink type ==1 \n");
@@ -708,7 +820,7 @@ cb_have_data (GstPad    *pad,
 									printf("set status to NUll \n");
 									 //sleep(1);
 
-									rmv_keepalive_socket_rcv_source(sink);
+								//	rmv_keepalive_socket_rcv_source(sink);
 
 								//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 									g_main_loop_quit (tmp->loop);
@@ -716,7 +828,7 @@ cb_have_data (GstPad    *pad,
 									printf(" waitting thread exit \n");
 									g_thread_join(tmp->gthread);
 
-								//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
+								//printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 
 									if(g_hash_table_remove(gsthashtbale,tmp->sip_uri))
 									{
@@ -778,9 +890,9 @@ cb_have_data (GstPad    *pad,
 //				else
 //					printf("not find sipui \n");
 				}
-				break;
-			default:
-				break;
+			//	break;
+		//	default:
+		//		break;
 			}
 		}
 	}
@@ -793,6 +905,26 @@ cb_have_data (GstPad    *pad,
  {
      printf("free all keep alive source \n");
      rmv_keepalive_socket_rcv_source(value);
+ }
+
+
+
+ void foreach_sink_hashtab(gpointer key, gpointer value, gpointer user_data)
+ {
+	 Sink  *sink;
+	 sink = (Sink *)value;
+	 printf("call id = %s \n", key);
+
+	 cnt += sprintf(tx_buf+cnt,"callid=%s",key);
+ }
+
+ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
+ {
+	 GstCustom *gstdata;
+	 gstdata = (GstCustom *)value;
+	 cnt += sprintf(tx_buf+cnt,"sipuri=%s",key);
+	 printf("cnt = %d %s \n", cnt, tx_buf);
+	 g_hash_table_foreach(gstdata->sink_hashtable, foreach_sink_hashtab, NULL);
  }
 
 
@@ -1024,8 +1156,12 @@ keep_alive_timed_out_cb (GSocket      *client,
 {
 	 Sink *sink = (Sink *) user_data;
 
-	 if(sink->keep_alive_flag == FALSE)
-	  return;
+	 if(sink->keep_alive_flag == FALSE && sink->Nat_Traversal == FALSE)
+	 {
+		 //Create socket for receive data
+		 return;
+	 }
+
 
     GSocketAddress *src_address;
     GError *error = NULL;
@@ -1048,6 +1184,10 @@ keep_alive_timed_out_cb (GSocket      *client,
     				  error->message);
 
      	printf(" sipuri %s, callid %s not receive keeplive \n", sink->sipuri,sink->callid);
+
+     	bzero(tx_buf,sizeof(tx_buf));
+    	sprintf(tx_buf, "callid=%s;notgotkeepalivesignal;",sink->callid);
+    	send_packet(tx_buf,strlen(tx_buf),g_remote_ip);
 
             // need add mutex
      	GstCustom *tmp = g_hash_table_lookup (gsthashtbale, sink->sipuri);
@@ -1102,7 +1242,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 							printf("set status to NUll \n");
 							//sleep(1);
 
-							rmv_keepalive_socket_rcv_source(sink);
+						//	rmv_keepalive_socket_rcv_source(sink);
 
 						//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 							g_main_loop_quit (tmp->loop);
@@ -1151,18 +1291,33 @@ keep_alive_timed_out_cb (GSocket      *client,
     else if(len > 0)
     {
     	printf(" len=%d, buf=%s \n", len, buf);
+    	printf(" Nat_Traversal=%d, Get_Nat_add_flag=%d \n", len, buf);
+    	if(sink->Nat_Traversal == 1 && sink->Get_Nat_address_flag == 0)
+    	{
+			gchar *str;
+			GInetAddress *addr;
+			addr= g_inet_socket_address_get_address(G_INET_SOCKET_ADDRESS(src_address));
+			guint16 port = g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(src_address));
 
-		GInetAddress *addr = g_inet_socket_address_get_address(G_INET_SOCKET_ADDRESS(src_address));
-		guint16 port = g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(src_address));
+			str = g_inet_address_to_string(addr);
+			g_print("New Connection from %s:%d\n", str, port);
 
-		g_print("New Connection from %s:%d\n", g_inet_address_to_string(addr), port);
 
-		// create NAT sink in here
+			// create NAT sink in here
+			g_object_unref (addr);
 
-		g_object_unref (src_address);
-		g_object_unref (addr);
+			sink->Get_Nat_address_flag = 1;
+
+			// remove the sdp address, send to the NAT address
+			 g_signal_emit_by_name (sink->sink, "remove", sink->dst_ip, sink->dst_port, NULL);
+
+			 g_signal_emit_by_name (sink->sink, "add", str, port, NULL);
+
+			 g_free(str);
+    	}
 
     }
+     g_object_unref (src_address);
 
       return TRUE;
 }
@@ -1171,8 +1326,12 @@ keep_alive_timed_out_cb (GSocket      *client,
 
  void create_keep_alive_socket_rcv_source(Sink *sink)
  {
-	 if(sink->keep_alive_flag == FALSE)
-	 return;
+	 if(sink->keep_alive_flag == FALSE && sink->Nat_Traversal == FALSE)
+	 {
+		 //Create socket for receive data
+		 return;
+	 }
+
 
 	 GError *err = NULL;
 	 GSource *source;
@@ -1184,18 +1343,23 @@ keep_alive_timed_out_cb (GSocket      *client,
 
 		g_assert(err == NULL);
 
-	    printf("sink snd_port %d \n ", sink->snd_port);
+	    printf("Create new socket for keep alive src_port %d \n ", sink->src_port);
 		flag= g_socket_bind( sink->sndkeepalive_socket,
-		 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string("0.0.0.0") ,sink->snd_port)),
+		 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(LOCAL_IP) ,sink->src_port)),
 		 	              TRUE,
 		 	              &err);
 		printf("flag = %d\n", flag);
 
-	    g_printerr ("ERROR:  %s\n", err->message);
+	   // g_printerr ("ERROR:  %s\n", err->message);
 		g_assert(err == NULL);
 
 		g_socket_set_blocking( sink->sndkeepalive_socket, FALSE);
-		g_socket_set_timeout( sink->sndkeepalive_socket, 30);
+
+		// Only keep alive flag is true need set timeout event
+		if(sink->keep_alive_flag == TRUE)
+		{
+			g_socket_set_timeout( sink->sndkeepalive_socket, 60);
+		}
 
 		source =  g_socket_create_source(sink->sndkeepalive_socket, G_IO_IN, NULL);
 
@@ -1212,23 +1376,26 @@ keep_alive_timed_out_cb (GSocket      *client,
 
  void rmv_keepalive_socket_rcv_source( Sink *sink)
  {
-	 if(sink->keep_alive_flag == FALSE)
+	 if(sink->keep_alive_flag == FALSE && sink->Nat_Traversal == FALSE)
+	 {
 		 return;
+	 }
 
-	printf("remove callid keep alive %s \n", sink->callid );
+	printf("remove callid keep alive socket %s \n", sink->callid );
 	g_socket_close( sink->sndkeepalive_socket, NULL);
 
 	g_object_unref(sink->sndkeepalive_socket);
 	g_source_remove( sink->sourceid);
-	sink->keep_alive_flag = FALSE;
 
+	sink->keep_alive_flag = FALSE;
+	sink->Nat_Traversal = FALSE;
  }
 
 
- void senddatacb(GSocketAddress *add)
+ void senddatacb(Source *source)
  {
 	 GError *err = NULL;
-	  g_socket_send_to (sock,add ,
+	  g_socket_send_to (source->sndkeepalive_socket,source->address ,
 	  "helloword", 9,  NULL, &err);
  }
 
@@ -1244,7 +1411,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 	 GSource *source;
 	 gboolean flag;
 	 printf("socket create \n");
-	 sock = g_socket_new(G_SOCKET_FAMILY_IPV4,
+	 gstptr->source.sndkeepalive_socket = g_socket_new(G_SOCKET_FAMILY_IPV4,
                G_SOCKET_TYPE_DATAGRAM,
                G_SOCKET_PROTOCOL_UDP,
                &err);
@@ -1256,18 +1423,20 @@ keep_alive_timed_out_cb (GSocket      *client,
 	//			NULL, &err);
 
 	 //   printf("sink snd_port %d \n ", sink->snd_port);
-//		flag= g_socket_bind(sock,
-//		 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string("192.168.128.152") ,1029)),
-//		 	              TRUE,
-//		 	              &err);
-//		printf("flag = %d\n", flag);
+		flag= g_socket_bind( gstptr->source.sndkeepalive_socket,
+		 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(LOCAL_IP) ,gstptr->source.dst_port)),
+		 	              TRUE,
+		 	              &err);
+
+		printf("flag = %d\n", flag);
 
 	//   g_printerr ("ERROR:  %s\n", err->message);
 		//g_assert(err == NULL);
+	printf("IP= %s PORT = %d\n", gstptr->source.src_ip, gstptr->source.src_port);
+	gstptr->source.address= G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(gstptr->source.src_ip) ,gstptr->source.src_port));
+	// GSocketAddress *add= G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(gstptr->source.src_ip) ,1024));
 
-	 GSocketAddress *add= G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(gstptr->source.src_ip) ,gstptr->source.src_port));
-
-	gstptr->source.timesourceid = g_timeout_add_seconds(3,senddatacb,add);
+	gstptr->source.timesourceid = g_timeout_add_seconds(30,senddatacb,&(gstptr->source));
 
  }
 
@@ -1280,6 +1449,9 @@ keep_alive_timed_out_cb (GSocket      *client,
 	g_socket_close( gstptr->source.sndkeepalive_socket, NULL);
 
 	g_object_unref(gstptr->source.sndkeepalive_socket);
+
+	g_object_unref(gstptr->source.address);
+
 	g_source_remove( gstptr->source.timesourceid);
 	gstptr->source.keep_alive_flag = FALSE;
 
@@ -1334,11 +1506,40 @@ int
 main (int argc, char **argv)
 {
 	//  GMainContext *context;
-
+	FILE *fp = NULL;
 	//GstCustom gstdata;
 
 	//create a new time-out source
 	 //   source = g_timeout_source_new(1000);
+	 g_stpcpy(g_remote_ip, "192.168.128.151");
+
+
+	fp = fopen("/etc/mediaproxy.cfg", "rb");
+
+	 if(fp == NULL)
+	 {
+		 printf("not find /etc/mediaproxy.cfg \n");
+		 return 0;
+	 }
+	int size = fread(tx_buf,1,1500,fp);
+
+	if(Nat_ip_parse(tx_buf, size, g_nat_ip) == 0)
+	{
+		printf(" not find ip \n");
+		fclose(fp);
+		return 1;
+	}
+
+	if(rcv_ip_parse(tx_buf, size, g_rcv_ip) == 0)
+	{
+		printf(" not find ip \n");
+		fclose(fp);
+		return 1;
+	}
+	fclose(fp);
+
+
+
 
 	pthread_t gst_rcv_tid;
 	pthread_t keep_alive_tid;
@@ -1377,7 +1578,7 @@ main (int argc, char **argv)
 
  	//create_keep_alive_socket_rcv_source();
    pthread_create(&gst_rcv_tid, NULL, cmd_thread,NULL); //创建线程
-   pthread_create(&keep_alive_tid, NULL, keep_alive_thread,NULL); //创建线程
+   //pthread_create(&keep_alive_tid, NULL, keep_alive_thread,NULL); //创建线程
 
 //    while(1)
 //    {

@@ -32,6 +32,36 @@ struct sockaddr_in gSndAddr;
 
 
 
+ int snd_socket_init(void)
+{
+	int sock;
+	sock = socket(AF_INET,SOCK_DGRAM,0);
+
+	return sock;
+}
+
+void send_packet(unsigned char *tx_buf ,int length, char *ip)//SNDBUFSIZE=30
+{
+
+	int i=0;
+	printf("ip = %s\n",ip);
+
+	memset(&gSndAddr, 0, sizeof(gSndAddr));
+	gSndAddr.sin_family = AF_INET;
+	gSndAddr.sin_addr.s_addr = inet_addr(ip);
+
+//	gSndAddr.sin_addr.s_addr = src_Addr.sin_addr.s_addr;
+
+	//printf("ip= %s",inet_ntoa(src_Addr.sin_addr));
+
+	gSndAddr.sin_port = htons(SND_PORT);
+
+	sendto(gSndSocket, tx_buf, length, 0, (struct sockaddr*)&gSndAddr, sizeof(struct sockaddr_in));
+
+
+}
+
+
 
   int rcv_socket_init(void)
 {
@@ -89,6 +119,7 @@ void Stop(int signo)
     exit_flag = True;
 
 	close(gRcvSocket);
+	close(gSndSocket);
 	//close(gSndSocket);
 
     _exit(0);
@@ -101,7 +132,7 @@ int src_type_parse(char *buff, int len)
 	//char type[3];
 	int flag =0;
     char type[2];
-	//memset(type,0,3);
+	 memset(type,0,2);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "srctype=", 8) == 0)
@@ -175,7 +206,7 @@ int sink_type_parse(char *buff, int len)
 	//char type[3];
 	int flag =0;
     char type[2];
-	//memset(type,0,3);
+	 memset(type,0,2);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sinktype=", 9) == 0)
@@ -212,7 +243,7 @@ int sink_src_port_parse(char *buff, int len)
 	//char type[3];
 	int flag =0;
     char type[6];
-	//memset(type,0,3);
+	 memset(type,0,6);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sinksrcport=", 12) == 0)
@@ -249,7 +280,7 @@ int sink_dst_port_parse(char *buff, int len)
 	//char type[3];
 	int flag =0;
     char type[6];
-	//memset(type,0,3);
+	 memset(type,0,6);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sinkdstport=", 12) == 0)
@@ -285,7 +316,7 @@ int source_dst_port_parse(char *buff, int len)
 	//char type[3];
 	int flag =0;
     char type[6];
-	//memset(type,0,3);
+	memset(type,0,6);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sourcedstport=", 14) == 0)
@@ -321,7 +352,7 @@ int source_src_port_parse(char *buff, int len)
 	//char type[3];
 	int flag =0;
     char type[6];
-	//memset(type,0,3);
+	memset(type,0,6);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sourcesrcport=", 14) == 0)
@@ -356,10 +387,10 @@ int sink_keep_alive_parse(char *buff, int len)
 
 	for(i =0 ;i < len ; i++)
 	{
-		if(memcmp(&buff[i], "sinkplv=true", 12) == 0)
+		if(memcmp(&buff[i], "sinkplv=ok", 10) == 0)
 		{
 
-			 printf("find sinkplv=true \n");
+			 printf("find sinkplv=ok \n");
 			 return TRUE;
 		}
 
@@ -367,7 +398,58 @@ int sink_keep_alive_parse(char *buff, int len)
 	return FALSE;
 }
 
+int source_keep_alive_parse(char *buff, int len)
+{
+	int i=0, j=0;
 
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sourcekplv=ok", 13) == 0)
+		{
+
+			 printf("find sourcekplv=true \n");
+			 return TRUE;
+		}
+
+	}
+	return FALSE;
+}
+
+int remote_ip_parse(char *buff, int len, char *remote_ip)
+{
+	int i=0, j=0 ;
+	int cnt;
+	//char type[3];
+	int flag =0;
+
+	memset(remote_ip,0,20);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "myip=", 5) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+5;
+			 printf("find myip \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			  return 1;
+			// break;
+		}
+
+		if(flag == 1)
+		{
+			remote_ip[j++] = buff[i];
+
+		}
+
+	}
+	return  0;
+
+}
 int sipuri_parse(char *buff, int len, char *sipuri)
 {
 	int i=0, j=0 ;
@@ -412,6 +494,7 @@ int request_address(char *buff, int len)
 	int flag =0;
     char type[2];
 	//memset(type,0,3);
+ //   printf("find buff =%s \n", buff);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "reqadd=ok", 9) == 0)
@@ -442,7 +525,7 @@ int callid_parse(char *buff, int len, char *callid)
 		{
 			 cnt = i;
 			 flag = 1;
-			 i=i+6;
+			 i=i+7;
 			 printf("find callid \n");
 		}
 
@@ -524,7 +607,7 @@ int sink_dst_ip_parse(char *buff, int len, char *dst_ip)
 	int flag =0;
     char port[6];
     int maohaoflag = 0;
-	//memset(type,0,3);
+	memset(dst_ip,0,20);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sinkdstip=", 10) == 0)
@@ -561,7 +644,7 @@ int sink_src_ip_parse(char *buff, int len, char *dst_ip)
 	int flag =0;
     char port[6];
     int maohaoflag = 0;
-	//memset(type,0,3);
+    memset(dst_ip,0,20);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sinksrcip=", 10) == 0)
@@ -598,14 +681,14 @@ int source_src_ip_parse(char *buff, int len, char *dst_ip)
 	int flag =0;
     char port[6];
     int maohaoflag = 0;
-	//memset(type,0,3);
+    memset(dst_ip,0,20);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sourcesrcip=", 12) == 0)
 		{
 			 cnt = i;
 			 flag = 1;
-			 i=i+10;
+			 i=i+12;
 			 printf("find sourcesrcip \n");
 		}
 
@@ -636,7 +719,7 @@ int source_dst_ip_parse(char *buff, int len, char *dst_ip)
 	int flag =0;
     char port[6];
     int maohaoflag = 0;
-	//memset(type,0,3);
+    memset(dst_ip,0,20);
 	for(i =0 ;i < len ; i++)
 	{
 		if(memcmp(&buff[i], "sourcedstip=", 12) == 0)
@@ -663,6 +746,128 @@ int source_dst_ip_parse(char *buff, int len, char *dst_ip)
 	}
 	return 0;
 //	return  atoi(type);
+}
+
+int Nat_ip_parse(char *buff, int len, char *dst_ip)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	int flag =0;
+	memset(dst_ip,0,20);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "NAT_IP=", 7) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+7;
+			 printf("find NAT_IP \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			return 1;
+            break;
+
+		}
+
+		if(flag == 1)
+		{
+			dst_ip[j++] = buff[i];
+		}
+
+	}
+	return 0;
+}
+
+int rcv_ip_parse(char *buff, int len, char *dst_ip)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	int flag =0;
+	memset(dst_ip,0,20);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "LOCAL_MEDIA_RCV_IP=", 19) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+19;
+			 printf("find LOCAL_MEDIA_RCV_IP \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			return 1;
+            break;
+
+		}
+
+		if(flag == 1)
+		{
+			dst_ip[j++] = buff[i];
+		}
+
+	}
+	return 0;
+}
+
+int get_total_session(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[2];
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "getsession", 10) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+10;
+			 printf("find getsession=ok \n");
+			 return 1;
+		}
+
+	}
+	return 0;
+}
+
+int snd_ip_parse(char *buff, int len, char *dst_ip)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	int flag =0;
+	memset(dst_ip,0,20);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "LOCAL_MEDIA_RCV_IP=", 19) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+19;
+			 printf("find sourcedstip \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			return 1;
+            break;
+
+		}
+
+		if(flag == 1)
+		{
+			dst_ip[j++] = buff[i];
+		}
+
+	}
+	return 0;
 }
 
 int invite_parse(char *buff, int len)
@@ -704,6 +909,29 @@ int bye_parse(char *buff, int len)
 			 flag = 1;
 			 i=i+6;
 			 printf("find bye=ok \n");
+			 return 1;
+		}
+
+	}
+	return 0;
+}
+
+int Nat_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[2];
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "nat=ok", 6) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+6;
+			 printf("find nat=ok \n");
 			 return 1;
 		}
 
