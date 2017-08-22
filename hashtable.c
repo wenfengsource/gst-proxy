@@ -31,14 +31,18 @@ return h;
 
 void * free_value (gpointer data)
 {
-  printf ("freeing value: %s %p\n", (char *) data, data);
+	printf ("freeing value: %s %p\n", (char *) data, data);
   g_free (data);
+ // data = NULL;
+ // printf ("freeing VALUE %p\n", data);
 }
 
 void * free_key (gpointer data)
 {
   printf ("freeing key: %s %p\n", (char *) data, data);
   g_free (data);
+  //data = NULL;
+ // printf ("freeing KEY %p\n", data);
 }
 
 

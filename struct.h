@@ -34,12 +34,22 @@ typedef struct
 
 typedef struct
 {
+	GSocket *sock;
+	char ip[20];
+	int port;
+	char callid[50];
+	char sipuri[100];
+}Tcpclientsocketinfo;
+
+
+typedef struct
+{
   GstPad *teepad;
   GstElement *queue;
   GstElement *conv;
   GstElement *depay;
   GstElement *sink;
-  gboolean removing;
+  //gboolean removing;
 
   char dst_ip[20];
   int dst_port;
@@ -51,7 +61,7 @@ typedef struct
 
   char callid[50];
 
-  char sipuri[50];
+  char sipuri[100];
 
   int src_fd;  // socket used for receive keep_alive data
   int keep_alive_flag;
@@ -66,15 +76,20 @@ typedef struct
   int Nat_Traversal;  // NAT
   int Get_Nat_address_flag;
   //GHashTable Multi_Address; //  address as key, keep_live as value
-
+  int tcp_client_count;
+  //int tcp_client_callid;
   //GList *Address_list;
- // GHashTable *hashtb_address;   // call id as key SinkAddress as value
+
+ // Tcpclientsocketinfo  *tcpclientsock;
+  GHashTable *tcpclienthashtb;   // call id as key SinkAddress as value
 } Sink;
 
 typedef struct
 {
 	GstElement *src;
+	GstElement *rndbuffersize;
 	GstElement *tee;
+	GstElement *capsfilter;
 
     char dst_ip[20];
     char src_ip[20];
@@ -87,7 +102,7 @@ typedef struct
     guint timesourceid;
     char src_uri[50];
     int keep_alive_flag;
-  //  int snd_beatheart;
+
     int type;   // TCP/RTP/UDP
 }Source;
 
@@ -98,11 +113,12 @@ typedef struct
 	Source source;
     GstElement *pipeline;
 	GstBus *bus;
-	char sip_uri[50];  //  = sip_uri
+	char sip_uri[100];  //  = sip_uri
 	GMainLoop* loop;
 	GThread * gthread;
 	GHashTable *sink_hashtable; //sink type, udp/rtp/tcp  // call_id
 
+	Sink *tcpsink;  // Only have 1 tcpsink
 
 } GstCustom;
 

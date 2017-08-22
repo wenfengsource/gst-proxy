@@ -40,10 +40,12 @@ struct sockaddr_in gSndAddr;
 	return sock;
 }
 
-void send_packet(unsigned char *tx_buf ,int length, char *ip)//SNDBUFSIZE=30
+void send_packet(unsigned char *tx_buf ,int length, char *ip, int port)//SNDBUFSIZE=30
 {
 
 	int i=0;
+	struct sockaddr_in gSndAddr;
+
 	printf("ip = %s\n",ip);
 
 	memset(&gSndAddr, 0, sizeof(gSndAddr));
@@ -54,7 +56,7 @@ void send_packet(unsigned char *tx_buf ,int length, char *ip)//SNDBUFSIZE=30
 
 	//printf("ip= %s",inet_ntoa(src_Addr.sin_addr));
 
-	gSndAddr.sin_port = htons(SND_PORT);
+	gSndAddr.sin_port = htons(port);
 
 	sendto(gSndSocket, tx_buf, length, 0, (struct sockaddr*)&gSndAddr, sizeof(struct sockaddr_in));
 
@@ -77,9 +79,10 @@ void send_packet(unsigned char *tx_buf ,int length, char *ip)//SNDBUFSIZE=30
 	rcvAddr.sin_port = htons(RCV_PORT);
 	if (bind(sock, (struct sockaddr *) &rcvAddr, sizeof(struct sockaddr)) < 0)
 	{
-		printf("error bind failed");
+		printf("error bind failed \n");
 		close(sock);
 		sock = -1;
+		exit(0);
 	}
 	return sock;
 }
@@ -113,17 +116,7 @@ int receive_packet(unsigned char *rx_buf)
 
 
 
-void Stop(int signo)
-{
-    printf("oops! stop!!!\n");
-    exit_flag = True;
 
-	close(gRcvSocket);
-	close(gSndSocket);
-	//close(gSndSocket);
-
-    _exit(0);
-}
 
 int src_type_parse(char *buff, int len)
 {
@@ -814,6 +807,41 @@ int rcv_ip_parse(char *buff, int len, char *dst_ip)
 	return 0;
 }
 
+
+int control_ip_parse(char *buff, int len, char *dst_ip)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	int flag =0;
+	memset(dst_ip,0,20);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "CONTROL_IP=", 11) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+11;
+			 printf("find CONTROL_IP \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			return 1;
+            break;
+
+		}
+
+		if(flag == 1)
+		{
+			dst_ip[j++] = buff[i];
+		}
+
+	}
+	return 0;
+}
+
+
 int get_total_session(char *buff, int len)
 {
 	int i=0, j=0;
@@ -1001,5 +1029,46 @@ void  rcv_keep_alive_socket_close(int fd)
 	close(gSndSocket);
 }
 
+int udp_port_available_check(int port)
+{
+	//int port = 8888;
+	int flag = 0;
+	int fd = socket(AF_INET, SOCK_DGRAM, 0);
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	inet_pton(AF_INET, "0.0.0.0", &addr.sin_addr);
+	if(bind(fd, (struct sockaddr *)(&addr), sizeof(struct sockaddr)) < 0)
+	{
+		printf("port %d has been used.\n", port);
+		close(fd);
+		return flag = -1;
+	}
 
+	close(fd);
+	return flag = 1;
+
+}
+
+
+int tcp_port_available_check(int port)
+{
+	//int port = 8888;
+	int flag = 0;
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	inet_pton(AF_INET, "0.0.0.0", &addr.sin_addr);
+	if(bind(fd, (struct sockaddr *)(&addr), sizeof(struct sockaddr)) < 0)
+	{
+		printf("port %d has been used.\n", port);
+		close(fd);
+		return flag = -1;
+	}
+
+	close(fd);
+	return flag = 1;
+
+}
 
