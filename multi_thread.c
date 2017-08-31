@@ -21,10 +21,12 @@
 #define TCP    3
 #define RTSP   4
 
+#define DEBUG        1
+
 #define  RCV_PORT_MIN   60000
-#define  RCV_PORT_MAX   62000
-#define  SND_PORT_MIN   62002
-#define  SND_PORT_MAX   64000
+#define  RCV_PORT_MAX   64000
+#define  SND_PORT_MIN   64002
+#define  SND_PORT_MAX   68020
 #define  PORT_STEP      2
 #define KEEP_ALIVE_TIME_OUT     30
 // UDP port
@@ -78,6 +80,8 @@ int fd;
 void *new_pipeline_thread( gpointer *arg);
 //void add_source(GMainContext *context);
 void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data);
+void port_for_each(gpointer key, gpointer value, gpointer user_data);
+
 
 
 static gboolean
@@ -133,6 +137,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 	 sprintf(tx_buf,"sipuri=%s;getdata=false;",gst_ptr->sip_uri);
 	 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 	 g_mutex_unlock (&snd_data_mutex);
+
 	//  call thread exit
 	gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
 
@@ -560,6 +565,8 @@ void cb_tcp_client_socket_remove(GstElement* object,GSocket* arg0, gpointer user
 			// Disabling this might result in minor performance improvements
 			//g_object_set (gstcustom->source.src, "blocksize", 1024,NULL);
 
+			g_object_set (gstcustom->source.src, "bindip", LOCAL_IP ,NULL); // read data time-out
+			g_object_set (gstcustom->source.src, "bindport", gstcustom->source.dst_port ,NULL);
 
 	}
 
@@ -774,22 +781,32 @@ unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 		{
 			printf("remove udps sink successful \n");
 		}
+
+		 g_mutex_lock (&sink_snd_port_mutex);
+		 g_hash_table_remove(Hashtbl_udp_sink_snd_port,sink->callid);  // remove send port for sink
+		 g_mutex_unlock (&sink_snd_port_mutex);
+
 	}
 	else if(sink->type == TCP)
 	 {
 		if(gstptr->tcpsink != NULL && gstptr->tcpsink->tcpclienthashtb !=NULL)
 		{
-		 printf("destory tcpclienthashtb \n ");
+			 printf("destory tcpclienthashtb \n ");
 
-		g_hash_table_destroy (gstptr->tcpsink->tcpclienthashtb);
+			 g_mutex_lock (&sink_snd_port_mutex);
+			 g_hash_table_remove(Hashtbl_Tcp_sink_snd_port,gstptr->sip_uri);  // remove send port for sink
+			 g_mutex_unlock (&sink_snd_port_mutex);
 
-		gstptr->tcpsink->tcpclienthashtb = NULL;
-		gstptr->tcpsink = NULL;
+			g_hash_table_destroy (gstptr->tcpsink->tcpclienthashtb);
+
+			gstptr->tcpsink->tcpclienthashtb = NULL;
+			gstptr->tcpsink = NULL;
 
 		}
+
 		if(g_hash_table_remove(gstptr->sink_hashtable, "TCP"))
 		{
-		printf("remove tcp sink success  \n");
+			printf("remove tcp sink success  \n");
 		}
 	 }
 
@@ -847,6 +864,7 @@ cb_have_data (GstPad    *pad,
 		{
 			cnt = 0;
 			g_mutex_lock (&snd_data_mutex);
+			bzero(tx_buf,sizeof(tx_buf));
 			g_hash_table_foreach(gsthashtbale, foreach_gst_hashtab, NULL);
 
 			printf("tx_buf  %s \n", tx_buf);
@@ -883,75 +901,97 @@ cb_have_data (GstPad    *pad,
             int rcv_port = 0;
 			if(src_type == UDP)
 			{
+				ptr = NULL;
+				//sprintf(str, "%d", Cur_Rcv_Udp_Port);
+				g_mutex_lock (&source_rcv_port_mutex);
+				ptr = g_hash_table_lookup(Hashtbl_Udp_Source_rcv_port ,sipuri);
+				g_mutex_unlock (&source_rcv_port_mutex);
 				while(1)
 				{
-					ptr = NULL;
-					//sprintf(str, "%d", Cur_Rcv_Udp_Port);
-
-					g_mutex_lock (&source_rcv_port_mutex);
-					ptr = g_hash_table_lookup(Hashtbl_Udp_Source_rcv_port ,GINT_TO_POINTER(Cur_Rcv_Udp_Port));
-					g_mutex_unlock (&source_rcv_port_mutex);
 
 					if(ptr == NULL)
 					{
 						// this port is available
-						printf("not find port %d in Hashtbl_Udp_Source_rcv_port  \n", Cur_Rcv_Udp_Port);
+						printf("not find sipuri %d in Hashtbl_Udp_Source_rcv_port  \n", Cur_Rcv_Udp_Port);
 
-						   if(udp_port_available_check(Cur_Rcv_Udp_Port) == 1)
+					   if(udp_port_available_check(Cur_Rcv_Udp_Port) == 1)
+					   {
+						   printf("port = %d is available  \n", Cur_Rcv_Udp_Port);
+
+							rcv_port = Cur_Rcv_Udp_Port;
+
+							g_mutex_lock (&source_rcv_port_mutex);
+							//printf("inset port \n");
+							g_hash_table_insert ( Hashtbl_Udp_Source_rcv_port, g_strdup(sipuri),GINT_TO_POINTER(Cur_Rcv_Udp_Port));
+							g_mutex_unlock (&source_rcv_port_mutex);
+
+							Cur_Rcv_Udp_Port +=PORT_STEP;
+
+						   if(Cur_Rcv_Udp_Port >= RCV_PORT_MAX)
 						   {
-							   printf("port = %d is available  \n", Cur_Rcv_Udp_Port);
-							   break;
+							   Cur_Rcv_Udp_Port = RCV_PORT_MIN;
 						   }
-						   else
+
+						   break;
+					   }
+					   else
+					   {
+						   printf("port = %d is not available  \n", Cur_Rcv_Udp_Port);
+						   Cur_Rcv_Udp_Port +=PORT_STEP;
+
+						   if(Cur_Rcv_Udp_Port >= RCV_PORT_MAX)
 						   {
-							   printf("port = %d is not available  \n", Cur_Rcv_Udp_Port);
-							   Cur_Rcv_Udp_Port +=2;
+							   Cur_Rcv_Udp_Port = RCV_PORT_MIN;
 						   }
+					   }
 
 
 					}
 					else
 					{
 
-						printf(" find port= %d in Hashtbl_Udp_Source_rcv_port  sipuri = %s \n", Cur_Rcv_Udp_Port, ptr);  // this port is available
-						if(g_strcmp0(ptr,sipuri) == 0)
-						{
-							printf("the same sipuri \n");  // request the same sipuri streaming
-							break;
-						}
-						else
-						{
-							   //assign new port
-							   if(Cur_Rcv_Udp_Port >= RCV_PORT_MAX)
-							   {
-								   Cur_Rcv_Udp_Port = RCV_PORT_MIN;
-							   }
-							   Cur_Rcv_Udp_Port +=2;
+						//printf(" find port= %d in Hashtbl_Udp_Source_rcv_port  sipuri = %s \n", Cur_Rcv_Udp_Port, ptr);  // this port is available
+//						if(g_strcmp0(ptr,sipuri) == 0)
+//						{
+//							printf("the same sipuri \n");  // request the same sipuri streaming
+//							break;
+//						}
+//						else
+//						{
+//							   //assign new port
+//							   if(Cur_Rcv_Udp_Port >= RCV_PORT_MAX)
+//							   {
+//								   Cur_Rcv_Udp_Port = RCV_PORT_MIN;
+//							   }
+//							   Cur_Rcv_Udp_Port +=2;
+//
+//						}
 
+						rcv_port = GPOINTER_TO_INT(ptr);
 
-
-						}
+					//	printf("rcv_port is %d \n");
+						break;
 
 					}
 				}
-				rcv_port = Cur_Rcv_Udp_Port;
-				g_mutex_lock (&source_rcv_port_mutex);
-				//printf("inset port \n");
-				g_hash_table_insert ( Hashtbl_Udp_Source_rcv_port, GINT_TO_POINTER(Cur_Rcv_Udp_Port), g_strdup(sipuri));
-				g_mutex_unlock (&source_rcv_port_mutex);
+
+
+#ifdef DEBUG
+				g_hash_table_foreach(Hashtbl_Udp_Source_rcv_port, port_for_each, "udp source rcv port list" );
+#endif
 			   // printf("inset port 2\n");
 			}
 			else if(src_type == TCP)
 			{
+				ptr = NULL;
+				//sprintf(str, "%d", Cur_Rcv_Udp_Port);
+
+				g_mutex_lock (&source_rcv_port_mutex);
+				ptr = g_hash_table_lookup(Hashtbl_Tcp_Source_rcv_port ,sipuri);
+				g_mutex_unlock (&source_rcv_port_mutex);
+
 				while(1)
 				{
-					ptr = NULL;
-					//sprintf(str, "%d", Cur_Rcv_Udp_Port);
-
-					g_mutex_lock (&source_rcv_port_mutex);
-					ptr = g_hash_table_lookup(Hashtbl_Tcp_Source_rcv_port ,GINT_TO_POINTER(Cur_Rcv_Tcp_Port));
-					g_mutex_unlock (&source_rcv_port_mutex);
-
 					if(ptr == NULL)
 					{
 						// this port is available
@@ -960,58 +1000,75 @@ cb_have_data (GstPad    *pad,
 						   if(tcp_port_available_check(Cur_Rcv_Tcp_Port) == 1)
 						   {
 							   printf("port = %d is available  \n", Cur_Rcv_Tcp_Port);
+							   rcv_port = Cur_Rcv_Tcp_Port;
+
+
+								g_mutex_lock (&source_rcv_port_mutex);
+								//printf("inset port \n");
+								g_hash_table_insert ( Hashtbl_Tcp_Source_rcv_port, g_strdup(sipuri),GINT_TO_POINTER(Cur_Rcv_Tcp_Port));
+								g_mutex_unlock (&source_rcv_port_mutex);
+								 Cur_Rcv_Tcp_Port +=PORT_STEP;
+
+							   if(Cur_Rcv_Tcp_Port >= RCV_PORT_MAX)
+							   {
+								   Cur_Rcv_Tcp_Port = RCV_PORT_MIN;
+							   }
+
 							   break;
 						   }
 						   else
 						   {
 							   printf("port = %d is not available  \n", Cur_Rcv_Tcp_Port);
-							   Cur_Rcv_Tcp_Port +=2;
-						   }
+							   Cur_Rcv_Tcp_Port +=PORT_STEP;
 
+							   if(Cur_Rcv_Tcp_Port >= RCV_PORT_MAX)
+							   {
+								   Cur_Rcv_Tcp_Port = RCV_PORT_MIN;
+							   }
+
+						   }
 
 					}
 					else
 					{
 
-						printf(" find port= %d in Hashtbl_Tcp_Source_rcv_port  sipuri = %s \n", Cur_Rcv_Tcp_Port, ptr);  // this port is available
-						if(g_strcmp0(ptr,sipuri) == 0)
-						{
-							printf("the same sipuri \n");  // request the same sipuri streaming
-							break;
-						}
-						else
-						{
-							   //assign new port
-							   if(Cur_Rcv_Tcp_Port >= RCV_PORT_MAX)
-							   {
-								   Cur_Rcv_Tcp_Port = RCV_PORT_MIN;
-							   }
-							   Cur_Rcv_Tcp_Port +=2;
-						}
+						rcv_port =  GPOINTER_TO_INT(ptr);
+						break;
+//						printf(" find port= %d in Hashtbl_Tcp_Source_rcv_port  sipuri = %s \n", Cur_Rcv_Tcp_Port, ptr);  // this port is available
+//						if(g_strcmp0(ptr,sipuri) == 0)
+//						{
+//							printf("the same sipuri \n");  // request the same sipuri streaming
+//							break;
+//						}
+//						else
+//						{
+//							   //assign new port
+//							   if(Cur_Rcv_Tcp_Port >= RCV_PORT_MAX)
+//							   {
+//								   Cur_Rcv_Tcp_Port = RCV_PORT_MIN;
+//							   }
+//							   Cur_Rcv_Tcp_Port +=2;
+//						}
 
 					}
 				}
-				rcv_port = Cur_Rcv_Tcp_Port;
-				g_mutex_lock (&source_rcv_port_mutex);
-				//printf("inset port \n");
-				g_hash_table_insert ( Hashtbl_Tcp_Source_rcv_port, GINT_TO_POINTER(Cur_Rcv_Tcp_Port), g_strdup(sipuri));
-				g_mutex_unlock (&source_rcv_port_mutex);
-			   // printf("inset port 2\n");
+
+
+#ifdef DEBUG
+				g_hash_table_foreach(Hashtbl_Tcp_Source_rcv_port, port_for_each, "tcp source rcv port list" );
+#endif
+
 			}
 
 			if(sink_type == UDP)
 			{
+				ptr = NULL;
+				g_mutex_lock (&sink_snd_port_mutex);
+				ptr = g_hash_table_lookup(Hashtbl_udp_sink_snd_port ,callid);
+				g_mutex_unlock (&sink_snd_port_mutex);
+
 				while(1)
 				{
-					ptr = NULL;
-					//sprintf(str, "%d", Cur_Snd_Udp_Port);
-
-					 //printf("inset port 3\n");
-					g_mutex_lock (&sink_snd_port_mutex);
-					ptr = g_hash_table_lookup(Hashtbl_udp_sink_snd_port ,GINT_TO_POINTER(Cur_Snd_Udp_Port));
-					g_mutex_unlock (&sink_snd_port_mutex);
-
-					// printf("inset port 4\n");
 
 					if(ptr == NULL)
 					{
@@ -1020,49 +1077,54 @@ cb_have_data (GstPad    *pad,
 
 					   if(udp_port_available_check(Cur_Snd_Udp_Port) == 1)
 					   {
-						   printf("port = %d is available  \n", Cur_Snd_Udp_Port);
-							break;
+						    printf("port = %d is available  \n", Cur_Snd_Udp_Port);
+						    snd_port = Cur_Snd_Udp_Port;
+							g_mutex_lock (&sink_snd_port_mutex);
+							g_hash_table_insert ( Hashtbl_udp_sink_snd_port, g_strdup(callid), GINT_TO_POINTER(Cur_Snd_Udp_Port));
+							g_mutex_unlock (&sink_snd_port_mutex);
+
+						    Cur_Snd_Udp_Port +=PORT_STEP;
+						    if(Cur_Snd_Udp_Port >= SND_PORT_MAX)
+							{
+							   Cur_Snd_Udp_Port = SND_PORT_MIN;
+							}
+						    break;
 					   }
 					   else
 					   {
 						   printf("port = %d is not available  \n", Cur_Snd_Udp_Port);
-						   Cur_Rcv_Udp_Port +=2;
+						   Cur_Snd_Udp_Port +=PORT_STEP;
+
+							//assign new port
+							if(Cur_Snd_Udp_Port >= SND_PORT_MAX)
+							{
+							   Cur_Snd_Udp_Port = SND_PORT_MIN;
+							}
+
 					   }
 
 
 					}
 					else
 					{
-						if(g_strcmp0(ptr,callid) == 0)
-						{
-							printf("error : the same callid \n");  //
-							break;
-						}
-						//assign new port
-						if(Cur_Snd_Udp_Port >= SND_PORT_MAX)
-						{
-						   Cur_Snd_Udp_Port = SND_PORT_MIN;
-						}
-						Cur_Snd_Udp_Port +=2;
-
+						snd_port = GPOINTER_TO_INT(ptr);
+						break;
 					}
 				}
-				snd_port = Cur_Snd_Udp_Port;
-				g_mutex_lock (&sink_snd_port_mutex);
-				g_hash_table_insert ( Hashtbl_udp_sink_snd_port, GINT_TO_POINTER(Cur_Snd_Udp_Port), g_strdup(callid));
-				g_mutex_unlock (&sink_snd_port_mutex);
+
+#ifdef DEBUG
+		 		g_hash_table_foreach(Hashtbl_udp_sink_snd_port, port_for_each, "udp sink snd port list" );
+#endif
+
 			}
 			else if(sink_type == TCP)
 			{
+				ptr = NULL;
+				g_mutex_lock (&sink_snd_port_mutex);
+				ptr = g_hash_table_lookup(Hashtbl_Tcp_sink_snd_port ,sipuri);
+				g_mutex_unlock (&sink_snd_port_mutex);
 				while(1)
 				{
-					ptr = NULL;
-					//sprintf(str, "%d", Cur_Rcv_Udp_Port);
-
-					g_mutex_lock (&sink_snd_port_mutex);
-					ptr = g_hash_table_lookup(Hashtbl_Tcp_sink_snd_port ,GINT_TO_POINTER(Cur_Snd_Tcp_Port));
-					g_mutex_unlock (&sink_snd_port_mutex);
-
 					if(ptr == NULL)
 					{
 						// this port is available
@@ -1071,42 +1133,45 @@ cb_have_data (GstPad    *pad,
 						if(tcp_port_available_check(Cur_Snd_Tcp_Port) == 1)
 						{
 							printf("port = %d is available  \n", Cur_Snd_Tcp_Port);
+
+							g_mutex_lock (&sink_snd_port_mutex);
+							//printf("inset port \n");
+							g_hash_table_insert ( Hashtbl_Tcp_sink_snd_port, g_strdup(sipuri),GINT_TO_POINTER(Cur_Snd_Tcp_Port));
+							g_mutex_unlock (&sink_snd_port_mutex);
+							snd_port = Cur_Snd_Tcp_Port;
+							Cur_Snd_Tcp_Port +=PORT_STEP;
+							if(Cur_Snd_Tcp_Port >= SND_PORT_MAX)
+							{
+								Cur_Snd_Tcp_Port = SND_PORT_MIN;
+							}
+
 							break;
 						}
 						else
 						{
 							printf("port = %d is not available  \n", Cur_Snd_Tcp_Port);
-							Cur_Snd_Tcp_Port +=2;
+							Cur_Snd_Tcp_Port +=PORT_STEP;
+							if(Cur_Snd_Tcp_Port >= SND_PORT_MAX)
+							{
+								Cur_Snd_Tcp_Port = SND_PORT_MIN;
+							}
 						}
 					}
 					else
 					{
 
-						printf(" find port= %d in Hashtbl_Tcp_Source_rcv_port  sipuri = %s \n", Cur_Snd_Tcp_Port, ptr);  // this port is available
-						if(g_strcmp0(ptr,sipuri) == 0)
-						{
-							printf("the same sipuri \n");  // request the same sipuri streaming
-							break;
-						}
-						else
-						{
-						//assign new port
-							if(Cur_Snd_Tcp_Port >= SND_PORT_MAX)
-							{
-								Cur_Snd_Tcp_Port = SND_PORT_MIN;
-							}
-							Cur_Snd_Tcp_Port +=2;
-						}
+						snd_port = GPOINTER_TO_INT(ptr);
+						break;
 
 					}
 				}
-				snd_port = Cur_Snd_Tcp_Port;
 
-				g_mutex_lock (&sink_snd_port_mutex);
-				//printf("inset port \n");
-				g_hash_table_insert ( Hashtbl_Tcp_sink_snd_port, GINT_TO_POINTER(Cur_Snd_Tcp_Port), g_strdup(sipuri));
-				g_mutex_unlock (&sink_snd_port_mutex);
+
+
 				// printf("inset port 2\n");
+#ifdef DEBUG
+				g_hash_table_foreach(Hashtbl_Tcp_sink_snd_port, port_for_each, "tcp sink snd port list" );
+#endif
 
 			}
 
@@ -1286,7 +1351,7 @@ cb_have_data (GstPad    *pad,
 
 							Linksink_to_pipeline(tmp, tmp->tcpsink);
 
-							tmp->tcpsink->tcpclienthashtb = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value );
+							tmp->tcpsink->tcpclienthashtb = g_hash_table_new_full (g_str_hash , g_str_equal,free_tcpclient_key,  free_tcpclient_value );
 
 							 Tcpclientsocketinfo *tcpclient = g_new0(Tcpclientsocketinfo, 1);
 
@@ -1296,7 +1361,7 @@ cb_have_data (GstPad    *pad,
 							 g_stpcpy(tcpclient->callid, callid);
 							 g_stpcpy(tcpclient->sipuri, sipuri);
 							 printf("sink_hashtable  %d \n", g_hash_table_size(tmp->sink_hashtable));
-							 g_timeout_add_seconds(10,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
+							 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
 
 						 }
 						 else
@@ -1305,7 +1370,7 @@ cb_have_data (GstPad    *pad,
 							 tcpclient = g_hash_table_lookup (tmp->tcpsink->tcpclienthashtb, callid);
 							if(tcpclient != NULL)
 							{
-								printf("error the same callid and the same sipuri \n");
+								printf("tcp error the same callid and the same sipuri \n");
 								break;
 							}
 
@@ -1319,7 +1384,7 @@ cb_have_data (GstPad    *pad,
 							 g_stpcpy(tcpclient->callid, callid);
 							 g_stpcpy(tcpclient->sipuri, sipuri);
 
-							 g_timeout_add_seconds(10,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
+							 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
 						 }
 					}
 				}
@@ -1362,7 +1427,7 @@ cb_have_data (GstPad    *pad,
 						 gst_ptr->source.keep_alive_flag = source_keep_alive_flag;
 						 create_keep_alive_socket_for_sink(gst_ptr->sink);
 
-						 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value );
+						 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_sink_key,  free_sink_value );
 
 						 if(sink_type == UDP || sink_type == RTP)
 						 {
@@ -1394,7 +1459,7 @@ cb_have_data (GstPad    *pad,
 							 gst_ptr->tcpsink= gst_ptr->sink;
 							 gst_ptr->tcpsink->tcp_client_count = 1;
 
-							 gst_ptr->tcpsink->tcpclienthashtb = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value );
+							 gst_ptr->tcpsink->tcpclienthashtb = g_hash_table_new_full (g_str_hash , g_str_equal,free_tcpclient_key,  free_tcpclient_value );
 
 							 Tcpclientsocketinfo *tcpclient = g_new0(Tcpclientsocketinfo, 1);
 							 g_hash_table_insert (gst_ptr->tcpsink->tcpclienthashtb, g_strdup(callid), tcpclient);  //
@@ -1404,7 +1469,7 @@ cb_have_data (GstPad    *pad,
 							 g_stpcpy(tcpclient->callid, callid);
 							 g_stpcpy(tcpclient->sipuri, sipuri);
 
-							 g_timeout_add_seconds(10,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
+							 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 30ms
 
 							// printf( "sink address = %p \n", gst_ptr->tcpsink);
 							 printf( "tcpclienthashtb address = %p \n",  gst_ptr->tcpsink->tcpclienthashtb);
@@ -1443,10 +1508,7 @@ cb_have_data (GstPad    *pad,
 		}
 		else if(bye_flag == TRUE)
 		{
-			//switch(src_type)
-			{
-		//	case UDP:  //udp type src
-				{
+
 				//sprintf(gst_hashtable_key,"udp://%s",src_uri);
 				g_mutex_lock (&gst_mutex);
 				GstCustom *tmp = g_hash_table_lookup (gsthashtbale, sipuri);
@@ -1546,13 +1608,15 @@ cb_have_data (GstPad    *pad,
 
 				 		if(tmp->tcpsink->tcp_client_count == 0)  // remove tcpsink
 				 		{
-				 			// Release the tcp sink (server) port
-				 			g_mutex_lock (&sink_snd_port_mutex);
-							g_hash_table_remove(Hashtbl_Tcp_sink_snd_port, GINT_TO_POINTER(tmp->tcpsink->src_port));
-							g_mutex_unlock (&sink_snd_port_mutex);
+
 
 				 			if(g_hash_table_size(tmp->sink_hashtable) > 1)
 							{
+					 			// Release the tcp sink (server) port
+					 			g_mutex_lock (&sink_snd_port_mutex);
+								g_hash_table_remove(Hashtbl_Tcp_sink_snd_port, tmp->sip_uri);
+								g_mutex_unlock (&sink_snd_port_mutex);
+
 								printf(" remove tcp sink callid = %s \n", callid);
 								// g_hash_table_destroy(sink->hashtb_address);
 								 //g_hash_table_unref(sink->hashtb_address);
@@ -1630,42 +1694,9 @@ cb_have_data (GstPad    *pad,
 				{
 					printf("bye --not find sipuri =%s \n", sipuri);
 
-//				   // check udp type src pipeline if is created
-//					 printf("create pipeline \n");
-//					 GstCustom *gst_ptr = g_new0(GstCustom, 1);
-//				//	 gst_ptr->sip_uri = g_strdup_printf("udp://%s",src_uri);
-//					// g_stpcpy(gst_ptr->source.src_uri, "192.168.128.152:60000");
-//					 g_hash_table_insert (gsthashtbale,  gst_ptr->sip_uri, gst_ptr);
-//
-//					 printf("Create sink \n");
-//					 gst_ptr->sink = g_new0(Sink, 1);
-//					 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value );
-//					 g_hash_table_insert (gst_ptr->sink_hashtable, g_strdup("UDP"), gst_ptr->sink);
-//
-//					 // store dst address to glist
-//					 //gst_ptr->sink->dst_ip = g_strdup_printf("udp://%s",sink_dst_uri);
-//					 g_stpcpy(gst_ptr->sink->dst_ip, sink_dst_ip);
-//					 gst_ptr->sink->dst_port = sink_dst_port;
-//					 char dst_uri[50];
-//					 sprintf(dst_uri,"%s:%d",sink_dst_ip,sink_dst_port);
-//					 gst_ptr->sink->Address_list = g_list_append(gst_ptr->sink->Address_list, dst_uri);
-//
-//					 gst_ptr->gthread  = g_thread_new("jieshouip:port", new_pipeline_thread , gst_ptr);
 				}
-//
-//				gst_ptr = g_hash_table_lookup (ghashtbale, strdup("sipui"));
-//				if(gst_ptr != NULL)
-//				{
-//					g_print("find sipui \n");
-//					g_signal_emit_by_name (gst_ptr->sink->sink, "add", "192.168.2.2", 5004, NULL);
-//				}
-//				else
-//					printf("not find sipui \n");
-				}
-			//	break;
-		//	default:
-		//		break;
-			}
+
+
 		}
 	}
 	//printf("exit \n");
@@ -1679,15 +1710,21 @@ cb_have_data (GstPad    *pad,
 	 Sink *sink;
 	 sink = value;
 
-
-	 g_mutex_lock (&sink_snd_port_mutex);
-	 g_hash_table_remove(Hashtbl_udp_sink_snd_port,GINT_TO_POINTER(sink->src_port));  // remove send port for sink
-	 g_mutex_unlock (&sink_snd_port_mutex);
-
-     rmv_keepalive_socket_for_sink(sink);
+	 if(sink->type == UDP || sink->type == RTP)
+	 {
+		 g_mutex_lock (&sink_snd_port_mutex);
+		 g_hash_table_remove(Hashtbl_udp_sink_snd_port,sink->callid);  // remove send port for sink
+		 g_mutex_unlock (&sink_snd_port_mutex);
+		 rmv_keepalive_socket_for_sink(sink);
+	 }
 
  }
 
+
+ void port_for_each(gpointer key, gpointer value, gpointer user_data)
+ {
+	 printf("%s value = %s, port= %d \n",user_data,  key, GPOINTER_TO_INT(value));
+ }
 
 
  void foreach_sink_hashtab(gpointer key, gpointer value, gpointer user_data)
@@ -1730,8 +1767,9 @@ cb_have_data (GstPad    *pad,
 	g_main_loop_unref (gstdata->loop);
 	gst_object_unref (gstdata->pipeline);
 
+	// for each all sink and release udp sink snd port and keep alive socket
 	g_hash_table_foreach(gstdata->sink_hashtable, free_all_keepalive_for_sink, NULL);
-	//rmv_keepalive_socket_for_sink(gstdata->sink);
+
 
     printf("exit thread sipuri  %s \n", gstdata->sip_uri);
 
@@ -1741,6 +1779,13 @@ cb_have_data (GstPad    *pad,
 
 	 if(gstdata->tcpsink != NULL)
 	 {
+
+		// Release the tcp sink (server) port
+		g_mutex_lock (&sink_snd_port_mutex);
+		g_hash_table_remove(Hashtbl_Tcp_sink_snd_port, gstdata->sip_uri);
+		g_mutex_unlock (&sink_snd_port_mutex);
+
+
 		 if(gstdata->tcpsink->tcpclienthashtb != NULL)
 		 {
 			 printf("destory tcpclienthashtb --\n");
@@ -1759,9 +1804,13 @@ cb_have_data (GstPad    *pad,
 
 
 	 g_mutex_lock (&source_rcv_port_mutex);
-	 g_hash_table_remove(Hashtbl_Udp_Source_rcv_port, GINT_TO_POINTER(gstdata->source.dst_port));
-	 g_hash_table_remove(Hashtbl_Tcp_Source_rcv_port, GINT_TO_POINTER(gstdata->source.dst_port));
+	 if(gstdata->source.type == UDP || gstdata->source.type == RTP)
+		 g_hash_table_remove(Hashtbl_Udp_Source_rcv_port, gstdata->sip_uri);
+	 else if(gstdata->source.type == TCP)
+		 g_hash_table_remove(Hashtbl_Tcp_Source_rcv_port, gstdata->sip_uri);
 	 g_mutex_unlock (&source_rcv_port_mutex);
+
+
 
 	// remove_source();
 //	if(g_hash_table_remove(gsthashtbale,gstdata->sip_uri))
@@ -2324,14 +2373,15 @@ main (int argc, char **argv)
 	gst_init (&argc, &argv);
    // loop = g_main_loop_new (NULL, FALSE);
 
-    gsthashtbale = g_hash_table_new_full (g_str_hash , g_str_equal ,free_key,  free_value);
+    gsthashtbale = g_hash_table_new_full (g_str_hash , g_str_equal ,free_sipuri_key,  free_sipuri_value);
 
 
-    Hashtbl_Udp_Source_rcv_port = g_hash_table_new_full (g_direct_hash , g_direct_equal ,NULL,  free_value);
-    Hashtbl_udp_sink_snd_port = g_hash_table_new_full (g_direct_hash , g_direct_equal ,NULL,  free_value);
+    Hashtbl_Udp_Source_rcv_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_udp_rcv_port_key,NULL);
 
-    Hashtbl_Tcp_Source_rcv_port = g_hash_table_new_full (g_direct_hash , g_direct_equal ,NULL,  free_value);
-    Hashtbl_Tcp_sink_snd_port = g_hash_table_new_full (g_direct_hash , g_direct_equal ,NULL,  free_value);
+    Hashtbl_udp_sink_snd_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_udp_snd_port_key,NULL);
+
+    Hashtbl_Tcp_Source_rcv_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_tcp_rcv_port_key,NULL);
+    Hashtbl_Tcp_sink_snd_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_tcp_snd_port_key,NULL);
 
 
  	loop = g_main_loop_new (NULL, FALSE);
@@ -2350,7 +2400,6 @@ main (int argc, char **argv)
   //g_source_set_callback (source,timeout_callback,loop,NULL);
 
 	 g_main_loop_run (loop);
-
 
 	g_main_loop_unref (loop);
  	remove_source();
