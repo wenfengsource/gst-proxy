@@ -133,28 +133,13 @@ int src_type_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+8;
-			 printf("find src_type \n");
+			 printf("find src_type %d\n", atoi(&buff[i]));
+			 return atoi(&buff[i]);
 		}
-
-		if((flag == 1) && (buff[i]== 0x3b))
-		{
-			printf(" buff[i] = %02x\n",  buff[i]);
-		//	return 1;
-			 break;
-		}
-
-		if(flag == 1)
-		{
-			type[j++] = buff[i];
-
-		}
-
 
 	}
 
-	return  atoi(type);
-
-	//return  0;
+	return  0;
 }
 
 int src_uri_parse(char *buff, int len, char *dst)
@@ -207,24 +192,12 @@ int sink_type_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+9;
-			 printf("find sinktype \n");
+			 printf("find sinktype %d\n", atoi(&buff[i]));
+			return atoi(&buff[i]);
 		}
-
-		if((flag == 1) && (buff[i]== 0x3b))
-		{
-			printf(" buff[i] = %02x\n",  buff[i]);
-			//return 1;
-			 break;
-		}
-
-		if(flag == 1)
-		{
-			type[j++] = buff[i];
-
-		}
-
+ 
 	}
-	return  atoi(type);
+	return  0;
 }
 
 
@@ -244,25 +217,14 @@ int sink_src_port_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+12;
-			 printf("find sinkplv=true \n");
-		//	 return TRUE;
+			 printf("find sinksrcport=%d \n", atoi(&buff[i]));
+		 	 return atoi(&buff[i]);
 		}
 
-		if((flag == 1) && (buff[i]== 0x3b))
-		{
-			printf(" buff[i] = %02x\n",  buff[i]);
-			//return 1;
-			 break;
-		}
-
-		if(flag == 1)
-		{
-			type[j++] = buff[i];
-
-		}
+		 
 
 	}
-	return  atoi(type);
+	return  0;
 }
 
 
@@ -281,25 +243,11 @@ int sink_dst_port_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+12;
-			 printf("find sinkdstport=true \n");
-		//	 return TRUE;
+			 printf("find sinkdstport=%d \n", atoi(&buff[i]));
+		 	 return atoi(&buff[i]);
 		}
-
-		if((flag == 1) && (buff[i]== 0x3b))
-		{
-			printf(" buff[i] = %02x\n",  buff[i]);
-			//return 1;
-			 break;
-		}
-
-		if(flag == 1)
-		{
-			type[j++] = buff[i];
-
-		}
-
 	}
-	return  atoi(type);
+	return 0;
 }
 
 int source_dst_port_parse(char *buff, int len)
@@ -317,25 +265,13 @@ int source_dst_port_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+14;
-			 printf("find sourcedstport=true \n");
-		//	 return TRUE;
+			 printf("find sourcedstport= %d \n", atoi(&buff[i]));
+		 	 return atoi(&buff[i]);
 		}
-
-		if((flag == 1) && (buff[i]== 0x3b))
-		{
-			printf(" buff[i] = %02x\n",  buff[i]);
-			//return 1;
-			 break;
-		}
-
-		if(flag == 1)
-		{
-			type[j++] = buff[i];
-
-		}
+ 
 
 	}
-	return  atoi(type);
+	return  0;
 }
 
 int source_src_port_parse(char *buff, int len)
@@ -353,25 +289,105 @@ int source_src_port_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+14;
-			 printf("find sinkdstport=true \n");
-		//	 return TRUE;
+			 printf("find sourcesrcport= %d \n", atoi(&buff[i]));
+		 	 return atoi(&buff[i]);
 		}
+	}
+	return  0;
+}
 
-		if((flag == 1) && (buff[i]== 0x3b))
+int rcv_min_port_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	memset(type,0,6);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "RCV_PORT_MIN=", 13) == 0)
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
-			//return 1;
-			 break;
-		}
-
-		if(flag == 1)
-		{
-			type[j++] = buff[i];
-
+			 cnt = i;
+			 flag = 1;
+			 i=i+13;
+			 printf("RCV_PORT_MIN= %d\n", atoi(&buff[i]));
+		 	 return atoi(&buff[i]);
 		}
 
 	}
-	return  atoi(type);
+	return  60000;
+}
+
+int rcv_max_port_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	memset(type,0,6);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "RCV_PORT_MAX=", 13) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+13;
+			 printf("RCV_PORT_MAX= %d\n", atoi(&buff[i]));
+		 	 return atoi(&buff[i]);
+		}
+	}
+	return  61000;
+}
+
+int snd_min_port_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	memset(type,0,6);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "SND_PORT_MIN=", 13) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+13;
+			 printf("SND_PORT_MIN=%d \n" ,atoi(&buff[i]));
+			
+		 	 return atoi(&buff[i]);
+		}
+
+		 
+
+	}
+	return  61001;
+}
+
+int snd_max_port_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	memset(type,0,6);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "SND_PORT_MAX=", 13) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+13;
+			 printf("SND_PORT_MAX= %d \n", atoi(&buff[i]));
+		 	 return atoi(&buff[i]);
+		}
+
+	}
+	return  62000;
 }
 
 int sink_keep_alive_parse(char *buff, int len)
@@ -471,6 +487,42 @@ int sipuri_parse(char *buff, int len, char *sipuri)
 		if(flag == 1)
 		{
 			sipuri[j++] = buff[i];
+
+		}
+
+	}
+	return  0;
+
+}
+
+int jftcpstring_parse(char *buff, int len, char *jftcp)
+{
+	int i=0, j=0 ;
+	int cnt;
+	//char type[3];
+	int flag =0;
+
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "jftcpstring=", 12) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+12;
+			 printf("find sipuri \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+			printf(" buff[i] = %02x\n",  buff[i]);
+			  return 1;
+			// break;
+		}
+
+		if(flag == 1)
+		{
+			jftcp[j++] = buff[i];
 
 		}
 
@@ -782,12 +834,12 @@ int rcv_ip_parse(char *buff, int len, char *dst_ip)
 	memset(dst_ip,0,20);
 	for(i =0 ;i < len ; i++)
 	{
-		if(memcmp(&buff[i], "LOCAL_MEDIA_RCV_IP=", 19) == 0)
+		if(memcmp(&buff[i], "LOCAL_IP=", 9) == 0)
 		{
 			 cnt = i;
 			 flag = 1;
-			 i=i+19;
-			 printf("find LOCAL_MEDIA_RCV_IP \n");
+			 i=i+9;
+			 printf("find LOCAL_IP \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -865,20 +917,21 @@ int get_total_session(char *buff, int len)
 	return 0;
 }
 
-int snd_ip_parse(char *buff, int len, char *dst_ip)
+void keep_alive_string_parse(char *buff, int len, char *str)
 {
+
 	int i=0, j=0, k=0;
 	int cnt;
 	int flag =0;
-	memset(dst_ip,0,20);
+	//memset(dst_ip,0,20);
 	for(i =0 ;i < len ; i++)
 	{
-		if(memcmp(&buff[i], "LOCAL_MEDIA_RCV_IP=", 19) == 0)
+		if(memcmp(&buff[i], "sndkplvstring=", 14) == 0)
 		{
 			 cnt = i;
 			 flag = 1;
-			 i=i+19;
-			 printf("find sourcedstip \n");
+			 i=i+14;
+			 printf("find sndkplvstring \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -891,11 +944,35 @@ int snd_ip_parse(char *buff, int len, char *dst_ip)
 
 		if(flag == 1)
 		{
-			dst_ip[j++] = buff[i];
+			str[j++] = buff[i];
 		}
 
 	}
 	return 0;
+}
+
+int keep_alive_string_len_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	memset(type,0,6);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "sndkplvlen=", 11) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+11;
+			 printf("find sndkplvlen=%d \n", atoi(&buff[i]));
+		 	 return atoi(&buff[i]);
+		}
+ 
+
+	}
+	return  0;
 }
 
 int invite_parse(char *buff, int len)
@@ -1023,6 +1100,7 @@ void rcv_keep_alive_socket_read(Sink *Sink)
 //	printf(" msg=%s \n",  mesg);
 
 }
+
 
 void  rcv_keep_alive_socket_close(int fd)
 {

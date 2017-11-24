@@ -20,15 +20,21 @@
 #define RTP    2
 #define TCP    3
 #define RTSP   4
+#define JFTCP  5
 
 #define DEBUG        1
 
-#define  RCV_PORT_MIN   60000
-#define  RCV_PORT_MAX   64000
-#define  SND_PORT_MIN   64002
-#define  SND_PORT_MAX   68020
-#define  PORT_STEP      2
-#define KEEP_ALIVE_TIME_OUT     30
+static int rcv_port_min;
+static int rcv_port_max;
+static int snd_port_min;
+static int snd_port_max;
+#define  RCV_PORT_MIN   rcv_port_min
+#define  RCV_PORT_MAX   rcv_port_max
+#define  SND_PORT_MIN   snd_port_min
+#define  SND_PORT_MAX   snd_port_max
+
+#define  PORT_STEP      1
+#define KEEP_ALIVE_TIME_OUT     20
 // UDP port
 static int Cur_Rcv_Udp_Port=60000;
 static int Cur_Snd_Udp_Port=62002;
@@ -40,7 +46,7 @@ static char g_remote_ip[20];
 
 static char g_nat_ip[20];
 static char g_rcv_ip[20];
-static char g_snd_ip[20];
+//static char g_snd_ip[20];
 
 #define LOCAL_IP   g_rcv_ip
 
@@ -82,8 +88,6 @@ void *new_pipeline_thread( gpointer *arg);
 void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data);
 void port_for_each(gpointer key, gpointer value, gpointer user_data);
 
-
-
 static gboolean
 message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 {
@@ -117,24 +121,58 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
   	}
   		break;
 	case GST_MESSAGE_ERROR:{
+#if 1
 	  GError *err = NULL;
 	  gchar *name, *debug = NULL;
-
+	  char *pt = NULL, *pt1 =NULL, *pt2 = NULL;
 	  name = gst_object_get_path_string (message->src);
 	  gst_message_parse_error (message, &err, &debug);
 
-	  g_printerr ("ERROR: from element %s: %s\n", name, err->message);
+	  g_printerr ("ERROR: from element %s ---: %s\n", name, err->message);
 	  if (debug != NULL)
 		g_printerr ("Additional debug info:\n%s\n", debug);
 
+	  pt = strstr(name,"GstTCPClientSink:"); // get callid for pt
+	  pt1 = strstr(err->message,"Could not open resource for reading");
+	  pt2 = strstr(err->message,"Error while sending data to");
 	  if(gst_message_has_name(message,"tcpserversink"))
 	  {
 		  printf("tcpserversink error message \n");
 	  }
+	
+ 	  if(pt != NULL)
+	  {
+
+		  	printf("GstTCPClientSink error message \n");
+		 	if(pt1 != NULL || pt2 != NULL)
+			{
+				g_mutex_lock (&snd_data_mutex);
+				bzero(tx_buf,sizeof(tx_buf));
+				sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",pt+17, gst_ptr->sip_uri);
+				send_packet(tx_buf,strlen(tx_buf),"127.0.0.1",50000);
+				g_mutex_unlock (&snd_data_mutex);
+
+				g_mutex_lock (&snd_data_mutex);
+				bzero(tx_buf,sizeof(tx_buf));
+				sprintf(tx_buf,"sipuri=%s;callid=%s;senddata=false;",gst_ptr->sip_uri,pt+17);
+				send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
+				g_mutex_unlock (&snd_data_mutex);
+
+				
+			}
+
+			g_error_free (err);
+			g_free (debug);
+			g_free (name);
+
+			break;
+
+	  }
+
 
 	 g_mutex_lock (&snd_data_mutex);
 	 bzero(tx_buf,sizeof(tx_buf));
-	 sprintf(tx_buf,"sipuri=%s;getdata=false;",gst_ptr->sip_uri);
+	 sprintf(tx_buf,"sipuri=%s;senddata=false;",gst_ptr->sip_uri);
 	 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 	 g_mutex_unlock (&snd_data_mutex);
 
@@ -153,13 +191,15 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 	}
 	g_mutex_unlock (&gst_mutex);
 
+	g_error_free (err);
+	g_free (debug);
+	g_free (name);
+#endif
 
-	 g_error_free (err);
-	  g_free (debug);
-	  g_free (name);
+	break;
 
-	  break;
-}
+	}
+
     case GST_MESSAGE_WARNING:{
       GError *err = NULL;
       gchar *name, *debug = NULL;
@@ -399,7 +439,7 @@ void cb_tcp_client_remove(GstElement* object,GSocket* arg0, gpointer arg1, gpoin
 	if(sink->tcpclienthashtb == NULL)
 		return;
 
-	item_ptr = g_hash_table_find(sink->tcpclienthashtb, find_key_function, arg0) ;
+	item_ptr = g_hash_table_find(sink->tcpclienthashtb, find_key_function, arg0);
 	if(item_ptr == NULL)
 	{
 		printf("not find assign tcp client \n");
@@ -570,6 +610,59 @@ void cb_tcp_client_socket_remove(GstElement* object,GSocket* arg0, gpointer user
 
 	}
 
+	else if(gstcustom->source.type == JFTCP)
+	{
+			gstcustom->source.src = gst_element_factory_make ("tcpserversrc", "tcpserversrc");
+			gstcustom->source.tee = gst_element_factory_make ("tee", "tee");
+			gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
+			gstcustom->source.capsfilter = gst_element_factory_make ("capsfilter", "capsfilter");
+
+			if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.rndbuffersize || !gstcustom->source.capsfilter || !gstcustom->source.tee) {
+				g_error ("Failed to create elements");
+				return -1;
+			}
+
+
+			//g_object_set (src, "caps", gst_caps_new_simple("application/x-rtp", "media", G_TYPE_STRING,"video","payload",G_TYPE_INT,33, NULL), NULL);
+			g_object_set (gstcustom->source.capsfilter , "caps", gst_caps_new_simple("video/mpegts", "packetsize",G_TYPE_INT,188, NULL), NULL);
+
+
+			gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src,gstcustom->source.rndbuffersize,gstcustom->source.capsfilter, gstcustom->source.tee,NULL);
+		if (!gst_element_link_many (gstcustom->source.src,gstcustom->source.rndbuffersize,gstcustom->source.capsfilter, gstcustom->source.tee, NULL))
+		{
+			g_error ("Failed to link elements");
+			return -2;
+		}
+
+		//g_signal_connect (dbin, "pad-added", G_CALLBACK (pad_added_cb), NULL);
+
+		//loop = g_main_loop_new (NULL, FALSE);
+
+
+		//g_object_set (gstcustom->source.src, "timeout",10000000000);
+
+
+		//printf("gstcustom->sipuri = %s \n",gstcustom->sip_uri);
+
+
+
+			//  g_object_set (gstcustom->source.src, "uri",gstcustom->source.src_uri, NULL);
+			g_object_set (gstcustom->source.src, "port", gstcustom->source.dst_port,NULL);
+			//printf("tcp srcport=%d srcip = %s \n", gstcustom->source.src_port, gstcustom->source.src_ip);
+			g_object_set (gstcustom->source.src, "host", "0.0.0.0",NULL);
+			//g_object_set (gstcustom->source.src, "timeout", 10 ,NULL); // read data time-out
+
+			g_object_set (gstcustom->source.rndbuffersize, "min", 1316,NULL);
+			g_object_set (gstcustom->source.rndbuffersize, "max", 1316,NULL);
+			// Disabling this might result in minor performance improvements
+			//g_object_set (gstcustom->source.src, "blocksize", 1024,NULL);
+
+		//	g_object_set (gstcustom->source.src, "bindip", LOCAL_IP ,NULL); // read data time-out
+		//	g_object_set (gstcustom->source.src, "bindport", gstcustom->source.dst_port ,NULL);
+
+	}
+
+
 	gstcustom->bus = gst_pipeline_get_bus (GST_PIPELINE (gstcustom->pipeline));
 	gst_bus_add_signal_watch (gstcustom->bus);
 	g_signal_connect (G_OBJECT (gstcustom->bus), "message", G_CALLBACK (message_cb), gstcustom);
@@ -588,7 +681,7 @@ void cb_tcp_client_socket_remove(GstElement* object,GSocket* arg0, gpointer user
 
 	    if(gstcustom->sink->type == UDP || gstcustom->sink->type == RTP)
 	    {
-			gstcustom->sink->sink = gst_element_factory_make ("multiudpsink", "multiudpsink");
+			gstcustom->sink->sink = gst_element_factory_make ("multiudpsink", gstcustom->sink->callid);
 
 			if(gstcustom->sink->sndkeepalive_socket != NULL)
 			{
@@ -633,6 +726,16 @@ void cb_tcp_client_socket_remove(GstElement* object,GSocket* arg0, gpointer user
 //	    	      "sync-method", 1 /* next-keyframe */ ,
 //	    	      NULL);
 	    }
+		else if(gstcustom->sink->type == JFTCP)
+		{
+			gstcustom->sink->sink = gst_element_factory_make ("tcpclientsink", gstcustom->sink->callid);
+			g_object_set (gstcustom->sink->sink, "host", gstcustom->sink->dst_ip, NULL);
+			g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->dst_port , NULL);   
+			g_object_set (gstcustom->sink->sink, "jftcpstring", gstcustom->sink->jftcpstring , NULL); 
+			g_object_set (gstcustom->sink->sink, "jftcpflag", 1 , NULL);
+			g_object_set (gstcustom->sink->sink, "bindport", gstcustom->sink->src_port , NULL);
+			g_object_set (gstcustom->sink->sink, "bindip", LOCAL_IP ,NULL); 
+		}
 
         gst_bin_add_many (GST_BIN (gstcustom->pipeline), gst_object_ref (gstcustom->sink->queue),gst_object_ref (gstcustom->sink->sink), NULL);
 	   // gst_bin_add_many (GST_BIN (gstcustom->pipeline),gstcustom->sink->queue, gstcustom->sink->sink, NULL);
@@ -684,10 +787,29 @@ int Linksink_to_pipeline(GstCustom *gstcustom, Sink *sink)
 		 	g_signal_connect (gstcustom->sink->sink, "client-removed",G_CALLBACK (cb_tcp_client_remove), sink);
 		//	g_signal_connect (gstcustom->sink->sink, "client-socket-removed",G_CALLBACK (cb_tcp_client_socket_remove), gstcustom);
 		}
+		else if(sink->type == JFTCP)
+		{
+			gstcustom->sink->sink = gst_element_factory_make ("tcpclientsink", gstcustom->sink->callid);
+			gstcustom->sink->queue = gst_element_factory_make ("queue", "queue");
+
+			if (!gstcustom->sink->sink  || !gstcustom->sink->queue) {
+				g_error ("Failed to create elements");
+				return -1;
+			}
+			g_object_set (gstcustom->sink->sink, "host", gstcustom->sink->dst_ip, NULL);
+			g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->dst_port , NULL);   
+			g_object_set (gstcustom->sink->sink, "jftcpstring", gstcustom->sink->jftcpstring , NULL); 
+			g_object_set (gstcustom->sink->sink, "jftcpflag", 1 , NULL);
+			g_object_set (gstcustom->sink->sink, "bindport", gstcustom->sink->src_port , NULL);
+			g_object_set (gstcustom->sink->sink, "bindip", LOCAL_IP ,NULL); 
+
+
+		}
+
 	    else
 	    {
 			sink->queue = gst_element_factory_make ("queue", NULL);
-			sink->sink = gst_element_factory_make ("multiudpsink", NULL);
+			sink->sink = gst_element_factory_make ("multiudpsink", sink->callid);
 
 		//	g_object_set (sink->sink, "bind-address",sink->src_ip,"bind-port",sink->src_port, NULL);
 
@@ -752,7 +874,7 @@ unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 
 	gst_object_unref (sinkpad);
 
-	if(sink->type == UDP || sink->type == TCP)
+	if(sink->type == UDP || sink->type == TCP || sink->type == JFTCP)
 	{
 		gst_bin_remove (GST_BIN (gstptr->pipeline), sink->queue);
 
@@ -776,17 +898,28 @@ unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 	{
 		 rmv_keepalive_socket_for_sink(sink);
 
-
+		 g_mutex_lock (&gstptr->sink_hash_mutex);
 		if(g_hash_table_remove(gstptr->sink_hashtable, sink->callid))
 		{
 			printf("remove udps sink successful \n");
 		}
+		 g_mutex_unlock (&gstptr->sink_hash_mutex);
 
 		 g_mutex_lock (&sink_snd_port_mutex);
 		 g_hash_table_remove(Hashtbl_udp_sink_snd_port,sink->callid);  // remove send port for sink
 		 g_mutex_unlock (&sink_snd_port_mutex);
 
 	}
+	else if( sink->type == JFTCP)
+	{
+ 		g_mutex_lock (&gstptr->sink_hash_mutex);
+		if(g_hash_table_remove(gstptr->sink_hashtable, sink->callid))
+		{
+			printf("remove JFTCP sink successful \n");
+		}
+		g_mutex_unlock (&gstptr->sink_hash_mutex);
+	}
+
 	else if(sink->type == TCP)
 	 {
 		if(gstptr->tcpsink != NULL && gstptr->tcpsink->tcpclienthashtb !=NULL)
@@ -803,11 +936,12 @@ unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 			gstptr->tcpsink = NULL;
 
 		}
-
+		 g_mutex_lock (&gstptr->sink_hash_mutex);
 		if(g_hash_table_remove(gstptr->sink_hashtable, "TCP"))
 		{
 			printf("remove tcp sink success  \n");
 		}
+		 g_mutex_unlock (&gstptr->sink_hash_mutex);
 	 }
 
 	return GST_PAD_PROBE_REMOVE;
@@ -880,7 +1014,6 @@ cb_have_data (GstPad    *pad,
 			return 0;
 			//continue;
 		}
-
 		memset(callid, 0 ,50);
 		if(callid_parse(rx_buf,rcv_size,callid) == 0)
 		{
@@ -981,7 +1114,7 @@ cb_have_data (GstPad    *pad,
 #endif
 			   // printf("inset port 2\n");
 			}
-			else if(src_type == TCP)
+			else if(src_type == TCP  || src_type == JFTCP)
 			{
 				ptr = NULL;
 				//sprintf(str, "%d", Cur_Rcv_Udp_Port);
@@ -1166,6 +1299,61 @@ cb_have_data (GstPad    *pad,
 					}
 				}
 
+#ifdef DEBUG
+				g_hash_table_foreach(Hashtbl_Tcp_sink_snd_port, port_for_each, "tcp sink snd port list" );
+#endif
+
+			}
+			else if(sink_type == JFTCP)
+			{
+				ptr = NULL;
+				g_mutex_lock (&sink_snd_port_mutex);
+				ptr = g_hash_table_lookup(Hashtbl_Tcp_sink_snd_port ,callid);
+				g_mutex_unlock (&sink_snd_port_mutex);
+				while(1)
+				{
+					if(ptr == NULL)
+					{
+						// this port is available
+							printf("not find port %d in Hashtbl_tcp sink_snd_port  \n", Cur_Snd_Tcp_Port);
+
+						if(tcp_port_available_check(Cur_Snd_Tcp_Port) == 1)
+						{
+							printf("port = %d is available  \n", Cur_Snd_Tcp_Port);
+
+							g_mutex_lock (&sink_snd_port_mutex);
+							//printf("inset port \n");
+							g_hash_table_insert (Hashtbl_Tcp_sink_snd_port, g_strdup(callid),GINT_TO_POINTER(Cur_Snd_Tcp_Port));
+							g_mutex_unlock (&sink_snd_port_mutex);
+							snd_port = Cur_Snd_Tcp_Port;
+							Cur_Snd_Tcp_Port +=PORT_STEP;
+							if(Cur_Snd_Tcp_Port >= SND_PORT_MAX)
+							{
+								Cur_Snd_Tcp_Port = SND_PORT_MIN;
+							}
+
+							break;
+						}
+						else
+						{
+							printf("port = %d is not available  \n", Cur_Snd_Tcp_Port);
+							Cur_Snd_Tcp_Port +=PORT_STEP;
+							if(Cur_Snd_Tcp_Port >= SND_PORT_MAX)
+							{
+								Cur_Snd_Tcp_Port = SND_PORT_MIN;
+							}
+						}
+					}
+					else
+					{
+
+						snd_port = GPOINTER_TO_INT(ptr);
+						break;
+
+					}
+				}
+
+
 
 
 				// printf("inset port 2\n");
@@ -1253,6 +1441,7 @@ cb_have_data (GstPad    *pad,
 
 			case TCP:
 			case UDP:  //udp type src
+			case JFTCP:
 			{
 				//sprintf(gst_hashtable_key,"udp://%s",src_uri);
 
@@ -1260,15 +1449,17 @@ cb_have_data (GstPad    *pad,
 				if(tmp != 0)  // src session id is esstibition
 				{
 					printf("find %s \n", sipuri);
-					if(sink_type == UDP)
+					if(sink_type == UDP || sink_type == JFTCP)
 					{
 
-						{
 							printf("find the same sipuri, attach the new sink to sipuri %s \n", sipuri);
 
 							Sink *sink;
 
+							g_mutex_lock (&tmp->sink_hash_mutex);
 							sink = g_hash_table_lookup (tmp->sink_hashtable, callid);
+							g_mutex_unlock (&tmp->sink_hash_mutex);
+
 							if(sink != NULL)
 							{
 								printf("error the same callid and the same sipuri \n");
@@ -1293,14 +1484,20 @@ cb_have_data (GstPad    *pad,
 
 							 create_keep_alive_socket_for_sink(sink);
 
+							 g_mutex_lock (&tmp->sink_hash_mutex);
 							 g_hash_table_insert (tmp->sink_hashtable, g_strdup(callid), sink);
+							 g_mutex_unlock (&tmp->sink_hash_mutex);
 
 							 printf("sink_hashtable  %d \n", g_hash_table_size(tmp->sink_hashtable));
 
 
 							 tmp->sink = sink;
 
-
+							if(sink_type == JFTCP)
+							{
+								memset(sink->jftcpstring,0,301);
+								jftcpstring_parse(rx_buf, rcv_size, sink->jftcpstring);
+							}
 							Linksink_to_pipeline(tmp, sink);
 
 //							 char dst_uri[50];
@@ -1315,7 +1512,7 @@ cb_have_data (GstPad    *pad,
 //
 //							 printf("hashtb_address size  %d \n", g_hash_table_size(sink->hashtb_address));
 							// sink->Address_list = g_list_append(sink->Address_list, dst_uri);
-						}
+						 
 					}
 					else if(sink_type ==RTP)
 					{
@@ -1340,7 +1537,9 @@ cb_have_data (GstPad    *pad,
 							 sink->type = sink_type;
 							 printf("sink->dst_port = %d \n", sink->dst_port);
 
+							 g_mutex_lock (&tmp->sink_hash_mutex);
 							 g_hash_table_insert (tmp->sink_hashtable, g_strdup("TCP"), sink);
+							 g_mutex_unlock (&tmp->sink_hash_mutex);
 
 							 printf("sink_hashtable  %d \n", g_hash_table_size(tmp->sink_hashtable));
 
@@ -1361,7 +1560,7 @@ cb_have_data (GstPad    *pad,
 							 g_stpcpy(tcpclient->callid, callid);
 							 g_stpcpy(tcpclient->sipuri, sipuri);
 							 printf("sink_hashtable  %d \n", g_hash_table_size(tmp->sink_hashtable));
-							 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
+					//		 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
 
 						 }
 						 else
@@ -1384,13 +1583,13 @@ cb_have_data (GstPad    *pad,
 							 g_stpcpy(tcpclient->callid, callid);
 							 g_stpcpy(tcpclient->sipuri, sipuri);
 
-							 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
+						//	 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 10ms
 						 }
 					}
 				}
 				else     // src session is not build, create new pipeline
 				{
-					if(sink_type == UDP || sink_type == TCP)
+					if(sink_type == UDP || sink_type == TCP || sink_type == JFTCP)
 					{
 					   // check udp type src pipeline if is created
 						 printf("create pipeline \n");
@@ -1414,10 +1613,15 @@ cb_have_data (GstPad    *pad,
 						 gst_ptr->sink->type = sink_type;
 						 gst_ptr->source.type = src_type;
 
-						 printf("gst_ptr.sink->dst_port = %d \n", gst_ptr->sink->dst_port);
+						 gst_ptr->source.keep_alive_str_lenth = keep_alive_string_len_parse(rx_buf, rcv_size);
+						 memset(gst_ptr->source.keep_alive_str, 0 ,100);
+						 keep_alive_string_parse(rx_buf, rcv_size,  gst_ptr->source.keep_alive_str);
+
+						// printf("gst_ptr.sink->dst_port = %d \n", gst_ptr->sink->dst_port);
 
 						 g_stpcpy(gst_ptr->source.src_ip, source_src_ip);
 						 g_stpcpy(gst_ptr->source.dst_ip, source_dst_ip);
+
 						 gst_ptr->source.src_port = source_src_port;
 						 gst_ptr->source.dst_port = source_dst_port;
 
@@ -1428,13 +1632,23 @@ cb_have_data (GstPad    *pad,
 						 create_keep_alive_socket_for_sink(gst_ptr->sink);
 
 						 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_sink_key,  free_sink_value );
+						 g_mutex_init (&gst_ptr->sink_hash_mutex);
 
-						 if(sink_type == UDP || sink_type == RTP)
+						 if(sink_type == UDP || sink_type == RTP || sink_type ==JFTCP)
 						 {
+							 g_mutex_lock (&gst_ptr->sink_hash_mutex);
 							 g_hash_table_insert (gst_ptr->sink_hashtable, g_strdup(callid), gst_ptr->sink);
+							 g_mutex_unlock (&gst_ptr->sink_hash_mutex);
 
 							 printf("sink_hashtable  %d \n", g_hash_table_size(gst_ptr->sink_hashtable));
 						 }
+
+						if(sink_type == JFTCP)
+						{	
+							memset(gst_ptr->sink->jftcpstring,0,301);
+							jftcpstring_parse(rx_buf, rcv_size, gst_ptr->sink->jftcpstring);
+						}
+
 					 // create address table
 	//					 gst_ptr->sink->hashtb_address = g_hash_table_new_full (g_str_hash , g_str_equal,free_key,  free_value);
 	//					 gst_ptr->sink->sinkaddress = g_new0(SinkAddress, 1);
@@ -1454,7 +1668,9 @@ cb_have_data (GstPad    *pad,
 
 						 else if(sink_type == TCP)  // Backup tcp sink
 						 {
+							 g_mutex_lock (&gst_ptr->sink_hash_mutex);
 							 g_hash_table_insert (gst_ptr->sink_hashtable, g_strdup("TCP"), gst_ptr->sink);
+							 g_mutex_unlock (&gst_ptr->sink_hash_mutex);
 
 							 gst_ptr->tcpsink= gst_ptr->sink;
 							 gst_ptr->tcpsink->tcp_client_count = 1;
@@ -1469,7 +1685,7 @@ cb_have_data (GstPad    *pad,
 							 g_stpcpy(tcpclient->callid, callid);
 							 g_stpcpy(tcpclient->sipuri, sipuri);
 
-							 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 30ms
+						//	 g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 30ms
 
 							// printf( "sink address = %p \n", gst_ptr->tcpsink);
 							 printf( "tcpclienthashtb address = %p \n",  gst_ptr->tcpsink->tcpclienthashtb);
@@ -1516,7 +1732,7 @@ cb_have_data (GstPad    *pad,
 				if(tmp != 0)  // src session is builded
 				{
 					printf("finded %s \n", sipuri);
-				 	if(sink_type == UDP)
+				 	if(sink_type == UDP || sink_type == JFTCP)
 					{
 						Sink *sink;
 					//	printf("remove sink type ==1 \n");
@@ -1530,9 +1746,11 @@ cb_have_data (GstPad    *pad,
 							{
 
 								// Only remove this udp sink
+								 g_mutex_lock (&tmp->sink_hash_mutex);
 								if(g_hash_table_size(tmp->sink_hashtable) > 1)
 								{
-									printf(" remove udp sink callid = %s \n", callid);
+									g_mutex_unlock (&tmp->sink_hash_mutex);
+									printf(" remove sink callid = %s \n", callid);
 									// g_hash_table_destroy(sink->hashtb_address);
 									 //g_hash_table_unref(sink->hashtb_address);
 
@@ -1551,6 +1769,7 @@ cb_have_data (GstPad    *pad,
 
 								else if((g_hash_table_size(tmp->sink_hashtable) == 1))
 								{
+									g_mutex_unlock (&tmp->sink_hash_mutex);
 									// only left one sink client, close this pipeline
 									printf("quit this pipeline \n");
 
@@ -1583,6 +1802,8 @@ cb_have_data (GstPad    *pad,
 								}
 								else
 								{
+									g_mutex_unlock (&tmp->sink_hash_mutex);
+
 									//printf("remove dst_uri %s \n" ,dst_uri);
 									//g_signal_emit_by_name (sink->sink, "remove", sink_dst_ip, sink_dst_port, NULL);
 									//sink->Address_list = g_list_remove(sink->Address_list, dst_uri);
@@ -1609,9 +1830,10 @@ cb_have_data (GstPad    *pad,
 				 		if(tmp->tcpsink->tcp_client_count == 0)  // remove tcpsink
 				 		{
 
-
+				 			g_mutex_lock (&tmp->sink_hash_mutex);
 				 			if(g_hash_table_size(tmp->sink_hashtable) > 1)
 							{
+				 				g_mutex_unlock (&tmp->sink_hash_mutex);
 					 			// Release the tcp sink (server) port
 					 			g_mutex_lock (&sink_snd_port_mutex);
 								g_hash_table_remove(Hashtbl_Tcp_sink_snd_port, tmp->sip_uri);
@@ -1644,6 +1866,7 @@ cb_have_data (GstPad    *pad,
 
 							else if((g_hash_table_size(tmp->sink_hashtable) == 1))
 							{
+								g_mutex_unlock (&tmp->sink_hash_mutex);
 								// only left one sink client, close this pipeline
 								printf("quit this pipeline \n");
 
@@ -1673,6 +1896,10 @@ cb_have_data (GstPad    *pad,
 								}
 								g_mutex_unlock (&gst_mutex);
 
+							}
+							else
+							{
+								g_mutex_unlock (&tmp->sink_hash_mutex);
 							}
 
 				 		}
@@ -1717,6 +1944,12 @@ cb_have_data (GstPad    *pad,
 		 g_mutex_unlock (&sink_snd_port_mutex);
 		 rmv_keepalive_socket_for_sink(sink);
 	 }
+	 else if(sink->type == JFTCP)
+	 {	
+		g_mutex_lock (&sink_snd_port_mutex);
+		g_hash_table_remove(Hashtbl_Tcp_sink_snd_port,sink->callid); 
+		g_mutex_unlock (&sink_snd_port_mutex);
+	 }
 
  }
 
@@ -1731,6 +1964,7 @@ cb_have_data (GstPad    *pad,
  {
 	 Sink  *sink;
 	 sink = (Sink *)value;
+
 	 printf("call id = %s \n", key);
 
 	 cnt += sprintf(tx_buf+cnt,"callid=%s",key);
@@ -1742,7 +1976,9 @@ cb_have_data (GstPad    *pad,
 	 gstdata = (GstCustom *)value;
 	 cnt += sprintf(tx_buf+cnt,"sipuri=%s",key);
 	 printf("cnt = %d %s \n", cnt, tx_buf);
+	 g_mutex_lock (&gstdata->sink_hash_mutex);
 	 g_hash_table_foreach(gstdata->sink_hashtable, foreach_sink_hashtab, NULL);
+	 g_mutex_unlock (&gstdata->sink_hash_mutex);
  }
 
 
@@ -1768,8 +2004,9 @@ cb_have_data (GstPad    *pad,
 	gst_object_unref (gstdata->pipeline);
 
 	// for each all sink and release udp sink snd port and keep alive socket
+	g_mutex_lock (&gstdata->sink_hash_mutex);
 	g_hash_table_foreach(gstdata->sink_hashtable, free_all_keepalive_for_sink, NULL);
-
+	g_mutex_unlock (&gstdata->sink_hash_mutex);
 
     printf("exit thread sipuri  %s \n", gstdata->sip_uri);
 
@@ -1801,12 +2038,12 @@ cb_have_data (GstPad    *pad,
 
 	 g_hash_table_destroy(gstdata->sink_hashtable);
 	 gstdata->sink_hashtable = NULL;
-
+	 g_mutex_clear (&gstdata->sink_hash_mutex);
 
 	 g_mutex_lock (&source_rcv_port_mutex);
 	 if(gstdata->source.type == UDP || gstdata->source.type == RTP)
 		 g_hash_table_remove(Hashtbl_Udp_Source_rcv_port, gstdata->sip_uri);
-	 else if(gstdata->source.type == TCP)
+	 else if(gstdata->source.type == TCP || gstdata->source.type == JFTCP)
 		 g_hash_table_remove(Hashtbl_Tcp_Source_rcv_port, gstdata->sip_uri);
 	 g_mutex_unlock (&source_rcv_port_mutex);
 
@@ -2155,7 +2392,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 		 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(LOCAL_IP) ,sink->src_port)),
 		 	              TRUE,
 		 	              &err);
-		printf("flag = %d\n", flag);
+		//printf("flag = %d\n", flag);
 		if(flag == 0)
 			return ;
 	   // g_printerr ("ERROR:  %s\n", err->message);
@@ -2202,9 +2439,18 @@ keep_alive_timed_out_cb (GSocket      *client,
 
  void senddatacb(Source *source)
  {
-	 GError *err = NULL;
-	  g_socket_send_to (source->sndkeepalive_socket,source->address ,
-	  "helloword", 9,  NULL, &err);
+	GError *err = NULL;
+	//printf("send keep alvie \n");
+	if(source->keep_alive_str_lenth > 0)
+	{
+		g_socket_send_to (source->sndkeepalive_socket,source->address ,
+		source->keep_alive_str, source->keep_alive_str_lenth,  NULL, &err);
+	}
+	else
+	{
+		g_socket_send_to (source->sndkeepalive_socket,source->address ,
+		"helloword", 9,  NULL, &err);
+	}
  }
 
 
@@ -2230,7 +2476,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 	//			G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string("192.168.128.151") ,5555)),
 	//			NULL, &err);
 
-	 //   printf("sink snd_port %d \n ", sink->snd_port);
+	   printf("LOCAL_IP %s port %d \n ", LOCAL_IP ,gstptr->source.dst_port);
 		flag= g_socket_bind( gstptr->source.sndkeepalive_socket,
 		 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(LOCAL_IP) ,gstptr->source.dst_port)),
 		 	              TRUE,
@@ -2333,12 +2579,12 @@ main (int argc, char **argv)
 	 g_stpcpy(g_remote_ip, "192.168.128.151");
 
 
-	fp = fopen("/etc/mediaproxy.cfg", "rb");
+	fp = fopen("./mediaproxy.cfg", "rb");
 
 	if(fp == NULL)
 	{
-	 printf("not find /etc/mediaproxy.cfg \n");
-	 return 0;
+		printf("not find mediaproxy.cfg \n");
+		return 0;
 	}
 	int size = fread(tx_buf,1,1500,fp);
 
@@ -2362,6 +2608,12 @@ main (int argc, char **argv)
 		fclose(fp);
 		return 1;
 	}
+	rcv_port_min = rcv_min_port_parse(tx_buf, size);
+	Cur_Rcv_Udp_Port = rcv_port_min;
+	rcv_port_max = rcv_max_port_parse(tx_buf, size);
+	snd_port_min = snd_min_port_parse(tx_buf, size);
+	Cur_Snd_Udp_Port = snd_port_min;
+	snd_port_max = snd_max_port_parse(tx_buf, size);
 
 	fclose(fp);
 

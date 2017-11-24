@@ -79,7 +79,7 @@ typedef struct
   int tcp_client_count;
   //int tcp_client_callid;
   //GList *Address_list;
-
+  char jftcpstring[301];
  // Tcpclientsocketinfo  *tcpclientsock;
   GHashTable *tcpclienthashtb;   // call id as key SinkAddress as value
 } Sink;
@@ -96,14 +96,15 @@ typedef struct
     int dst_port;
     int src_port;
     GSocket *sndkeepalive_socket;
-
+	char keep_alive_str[100];
+	int keep_alive_str_lenth;
     GSocketAddress *address;
 
     guint timesourceid;
     char src_uri[50];
     int keep_alive_flag;
 
-    int type;   // TCP/RTP/UDP
+    int type;   // TCP/RTP/UDP Jftcp
 }Source;
 
 
@@ -116,10 +117,11 @@ typedef struct
 	char sip_uri[100];  //  = sip_uri
 	GMainLoop* loop;
 	GThread * gthread;
+	GMutex sink_hash_mutex;
 	GHashTable *sink_hashtable; //sink type, udp/rtp/tcp  // call_id
 
 	Sink *tcpsink;  // Only have 1 tcpsink
-
+	//char tcpclientsinkcallid[50];
 } GstCustom;
 
 #endif
