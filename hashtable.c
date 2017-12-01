@@ -57,6 +57,15 @@ void * free_udp_rcv_port_key (gpointer data)
  // printf ("freeing KEY %p\n", data);
 }
 
+
+void * print_port_value (gpointer data)
+{
+	 printf("port = %d \n",GPOINTER_TO_INT(data));
+ // printf ("free_udp_rcv_port_key: %s %p\n", (char *) data, data);
+  //data = NULL;
+ // printf ("freeing KEY %p\n", data);
+}
+
 void * free_udp_snd_port_key (gpointer data)
 {
   printf ("free_udp_snd_port_key: %s %p\n", (char *) data, data);

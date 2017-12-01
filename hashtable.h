@@ -22,6 +22,7 @@ extern void * free_tcpclient_key (gpointer data);
 extern void * free_tcpclient_value (gpointer data);
 
 extern void * free_udp_rcv_port_key (gpointer data);
+extern void * print_port_value (gpointer data);
 extern void * free_udp_snd_port_key (gpointer data);
 extern void * free_tcp_rcv_port_key (gpointer data);
 extern void * free_tcp_snd_port_key (gpointer data);

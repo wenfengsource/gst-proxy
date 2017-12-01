@@ -162,7 +162,7 @@ int src_uri_parse(char *buff, int len, char *dst)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+			//printf(" buff[i] = %02x\n",  buff[i]);
 			  return 1;
 		    // break;
 		}
@@ -444,7 +444,7 @@ int remote_ip_parse(char *buff, int len, char *remote_ip)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+			//printf(" buff[i] = %02x\n",  buff[i]);
 			  return 1;
 			// break;
 		}
@@ -479,7 +479,7 @@ int sipuri_parse(char *buff, int len, char *sipuri)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+		//	printf(" buff[i] = %02x\n",  buff[i]);
 			  return 1;
 			// break;
 		}
@@ -515,7 +515,7 @@ int jftcpstring_parse(char *buff, int len, char *jftcp)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+			//printf(" buff[i] = %02x\n",  buff[i]);
 			  return 1;
 			// break;
 		}
@@ -576,7 +576,7 @@ int callid_parse(char *buff, int len, char *callid)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+			//printf(" buff[i] = %02x\n",  buff[i]);
 			  return 1;
 			// break;
 		}
@@ -615,7 +615,7 @@ int sink_dst_uri_parse(char *buff, int len, char *dst_ip, int *dst_port)
 
 		if((flag == 1) && (buff[i+1]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+		//	printf(" buff[i] = %02x\n",  buff[i]);
 			*dst_port =   atoi(port);
 
 			printf("sink dst port = %d \n" ,*dst_port);
@@ -665,7 +665,7 @@ int sink_dst_ip_parse(char *buff, int len, char *dst_ip)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+		//	printf(" buff[i] = %02x\n",  buff[i]);
 			return 1;
             break;
 
@@ -702,7 +702,7 @@ int sink_src_ip_parse(char *buff, int len, char *dst_ip)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+		//	printf(" buff[i] = %02x\n",  buff[i]);
 			return 1;
             break;
 
@@ -739,7 +739,7 @@ int source_src_ip_parse(char *buff, int len, char *dst_ip)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+		//	printf(" buff[i] = %02x\n",  buff[i]);
 			return 1;
             break;
 
@@ -777,7 +777,7 @@ int source_dst_ip_parse(char *buff, int len, char *dst_ip)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+		//	printf(" buff[i] = %02x\n",  buff[i]);
 			return 1;
             break;
 
@@ -811,7 +811,7 @@ int Nat_ip_parse(char *buff, int len, char *dst_ip)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+	//		printf(" buff[i] = %02x\n",  buff[i]);
 			return 1;
             break;
 
@@ -844,7 +844,7 @@ int rcv_ip_parse(char *buff, int len, char *dst_ip)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+		//	printf(" buff[i] = %02x\n",  buff[i]);
 			return 1;
             break;
 
@@ -878,7 +878,7 @@ int control_ip_parse(char *buff, int len, char *dst_ip)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+	//		printf(" buff[i] = %02x\n",  buff[i]);
 			return 1;
             break;
 
@@ -936,7 +936,7 @@ void keep_alive_string_parse(char *buff, int len, char *str)
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-			printf(" buff[i] = %02x\n",  buff[i]);
+			//printf(" buff[i] = %02x\n",  buff[i]);
 			return 1;
             break;
 

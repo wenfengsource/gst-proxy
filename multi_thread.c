@@ -2698,9 +2698,11 @@ main (int argc, char **argv)
 	}
 	rcv_port_min = rcv_min_port_parse(tx_buf, size);
 	Cur_Rcv_Udp_Port = rcv_port_min;
+	Cur_Rcv_Tcp_Port = rcv_port_min;
 	rcv_port_max = rcv_max_port_parse(tx_buf, size);
 	snd_port_min = snd_min_port_parse(tx_buf, size);
 	Cur_Snd_Udp_Port = snd_port_min;
+	Cur_Snd_Tcp_Port = snd_port_min;
 	snd_port_max = snd_max_port_parse(tx_buf, size);
 
 	fclose(fp);
@@ -2716,12 +2718,12 @@ main (int argc, char **argv)
     gsthashtbale = g_hash_table_new_full (g_str_hash , g_str_equal ,free_sipuri_key,  free_sipuri_value);
 
 
-    Hashtbl_Udp_Source_rcv_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_udp_rcv_port_key,NULL);
+    Hashtbl_Udp_Source_rcv_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_udp_rcv_port_key,print_port_value);
 
-    Hashtbl_udp_sink_snd_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_udp_snd_port_key,NULL);
+    Hashtbl_udp_sink_snd_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_udp_snd_port_key,print_port_value);
 
-    Hashtbl_Tcp_Source_rcv_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_tcp_rcv_port_key,NULL);
-    Hashtbl_Tcp_sink_snd_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_tcp_snd_port_key,NULL);
+    Hashtbl_Tcp_Source_rcv_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_tcp_rcv_port_key,print_port_value);
+    Hashtbl_Tcp_sink_snd_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_tcp_snd_port_key,print_port_value);
 
 
  	loop = g_main_loop_new (NULL, FALSE);
