@@ -28,7 +28,7 @@ typedef struct
 	int keep_alive;
 	int time_cnt;
 //	int sock_fd;
-	char callid[50];
+	char callid[100];
 }SinkAddress;
 
 
@@ -37,7 +37,7 @@ typedef struct
 	GSocket *sock;
 	char ip[20];
 	int port;
-	char callid[50];
+	char callid[100];
 	char sipuri[100];
 }Tcpclientsocketinfo;
 
@@ -59,7 +59,7 @@ typedef struct
   int src_port;
   char src_ip[20];
 
-  char callid[50];
+  char callid[100];
 
   char sipuri[100];
 
@@ -87,7 +87,8 @@ typedef struct
 typedef struct
 {
 	GstElement *src;
-	GstElement *rndbuffersize;
+	//GstElement *rndbuffersize;
+	//GstElement *queue;
 	GstElement *tee;
 	GstElement *capsfilter;
 
@@ -95,13 +96,13 @@ typedef struct
     char src_ip[20];
     int dst_port;
     int src_port;
-    GSocket *sndkeepalive_socket;
+  //  GSocket *sndkeepalive_socket;
 	char keep_alive_str[100];
 	int keep_alive_str_lenth;
-    GSocketAddress *address;
+   // GSocketAddress *address;
 
-    guint timesourceid;
-    char src_uri[50];
+  //  guint timesourceid;
+    char src_uri[100];
     int keep_alive_flag;
 
     int type;   // TCP/RTP/UDP Jftcp

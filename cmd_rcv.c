@@ -46,7 +46,7 @@ void send_packet(unsigned char *tx_buf ,int length, char *ip, int port)//SNDBUFS
 	int i=0;
 	struct sockaddr_in gSndAddr;
 
-	printf("ip = %s\n",ip);
+//	printf("ip = %s\n",ip);
 
 	memset(&gSndAddr, 0, sizeof(gSndAddr));
 	gSndAddr.sin_family = AF_INET;
@@ -806,12 +806,12 @@ int Nat_ip_parse(char *buff, int len, char *dst_ip)
 			 cnt = i;
 			 flag = 1;
 			 i=i+7;
-			 printf("find NAT_IP \n");
+			 printf("find NAT_IP ==");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-	//		printf(" buff[i] = %02x\n",  buff[i]);
+	 		printf(" %s\n",  dst_ip);
 			return 1;
             break;
 
@@ -839,12 +839,12 @@ int rcv_ip_parse(char *buff, int len, char *dst_ip)
 			 cnt = i;
 			 flag = 1;
 			 i=i+9;
-			 printf("find LOCAL_IP \n");
+			 printf("find LOCAL_IP =");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-		//	printf(" buff[i] = %02x\n",  buff[i]);
+		 	printf(" %s\n", dst_ip);
 			return 1;
             break;
 
@@ -873,12 +873,12 @@ int control_ip_parse(char *buff, int len, char *dst_ip)
 			 cnt = i;
 			 flag = 1;
 			 i=i+11;
-			 printf("find CONTROL_IP \n");
+			 printf("find CONTROL_IP == ");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
 		{
-	//		printf(" buff[i] = %02x\n",  buff[i]);
+	 		printf("%s\n",  dst_ip);
 			return 1;
             break;
 
