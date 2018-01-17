@@ -336,8 +336,8 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		  printf("received data from sipuri %s \n", gst_ptr->sip_uri);
 		  g_mutex_lock (&snd_data_mutex);
 		  bzero(tx_buf,sizeof(tx_buf));
-		  sprintf(tx_buf, "sipuri=%s;getdata=true;",gst_ptr->sip_uri);
-		  send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
+		   sprintf(tx_buf, "sipuri=%s;getdata=true;",gst_ptr->sip_uri);
+		//  send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 		  g_mutex_unlock (&snd_data_mutex);
       }
 
@@ -360,6 +360,8 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 		 g_mutex_unlock (&snd_data_mutex);
 		//  call thread exit
+		// printf("child thread tid = %u\n", pthread_self());
+
 		gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
 		usleep(50000);
 		//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
@@ -694,8 +696,8 @@ static void pad_added_handler_for_rtsp (GstElement *src, GstPad *new_pad, gpoint
         g_print ("Received data from '%s':\n", ptr->sip_uri);
         g_mutex_lock (&snd_data_mutex);
        	bzero(tx_buf,sizeof(tx_buf));
-       	sprintf(tx_buf, "sipuri=%s;getdata=true;",ptr->sip_uri);
-       	send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
+    //   	sprintf(tx_buf, "sipuri=%s;getdata=true;",ptr->sip_uri);
+       //	send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
        	g_mutex_unlock (&snd_data_mutex);
 
     }
@@ -1342,7 +1344,7 @@ cb_have_data (GstPad    *pad,
 		char gst_hashtable_key[100], sipuri[100], callid[100];
 
 
-		printf("receive data \n");
+		//printf("receive data \n");
 		//memset(rx_buf, 0 ,1500);
 
 		//rcv_size = receive_packet(rx_buf);
@@ -2408,6 +2410,7 @@ cb_have_data (GstPad    *pad,
 	gstdata->loop =  g_main_loop_new (NULL, FALSE);
 	printf("create new thread for new pipeline\n");
 
+	// printf("new_pipeline_thread tid = %u\n", pthread_self());
 
 	//create_keep_alive_socket_for_source(gstdata);
 
@@ -3026,7 +3029,7 @@ void Stop(int signo)
 int time_ticket()
 {
  	g_mutex_lock (&snd_data_mutex);
-	send_packet("helloword",9,g_remote_ip,SND_PORT);
+	send_packet("code=1004;keeplive=true;",sizeof("code=1004;keeplive=true;"),g_remote_ip,SND_PORT);
 	g_mutex_unlock (&snd_data_mutex);
 	return TRUE;
 }
