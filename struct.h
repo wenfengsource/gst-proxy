@@ -87,8 +87,12 @@ typedef struct
 typedef struct
 {
 	GstElement *src;
-	//GstElement *rndbuffersize;
-	//GstElement *queue;
+	GstElement *h264depay;  //for rtsp
+	GstElement *h264parse;  // rtsp
+	GstElement *audiodepay;  //for rtsp
+
+
+	GstElement *mpegtsmux;
 	GstElement *tee;
 	GstElement *capsfilter;
 

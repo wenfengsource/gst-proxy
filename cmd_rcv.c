@@ -133,7 +133,7 @@ int src_type_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+8;
-			 printf("find src_type %d\n", atoi(&buff[i]));
+			// printf("find src_type %d\n", atoi(&buff[i]));
 			 return atoi(&buff[i]);
 		}
 
@@ -157,7 +157,7 @@ int src_uri_parse(char *buff, int len, char *dst)
 			 cnt = i;
 			 flag = 1;
 			 i=i+10;
-			 printf("find srcrcvuri \n");
+	//		 printf("find srcrcvuri \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -192,7 +192,7 @@ int sink_type_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+9;
-			 printf("find sinktype %d\n", atoi(&buff[i]));
+	//		 printf("find sinktype %d\n", atoi(&buff[i]));
 			return atoi(&buff[i]);
 		}
  
@@ -217,7 +217,7 @@ int sink_src_port_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+12;
-			 printf("find sinksrcport=%d \n", atoi(&buff[i]));
+	//		 printf("find sinksrcport=%d \n", atoi(&buff[i]));
 		 	 return atoi(&buff[i]);
 		}
 
@@ -243,7 +243,7 @@ int sink_dst_port_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+12;
-			 printf("find sinkdstport=%d \n", atoi(&buff[i]));
+	//		 printf("find sinkdstport=%d \n", atoi(&buff[i]));
 		 	 return atoi(&buff[i]);
 		}
 	}
@@ -265,7 +265,7 @@ int source_dst_port_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+14;
-			 printf("find sourcedstport= %d \n", atoi(&buff[i]));
+		//	 printf("find sourcedstport= %d \n", atoi(&buff[i]));
 		 	 return atoi(&buff[i]);
 		}
  
@@ -289,7 +289,7 @@ int source_src_port_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+14;
-			 printf("find sourcesrcport= %d \n", atoi(&buff[i]));
+			// printf("sourcesrcport= %d \n", atoi(&buff[i]));
 		 	 return atoi(&buff[i]);
 		}
 	}
@@ -399,7 +399,7 @@ int sink_keep_alive_parse(char *buff, int len)
 		if(memcmp(&buff[i], "sinkplv=ok", 10) == 0)
 		{
 
-			 printf("find sinkplv=ok \n");
+		//	 printf("find sinkplv=ok \n");
 			 return TRUE;
 		}
 
@@ -416,7 +416,7 @@ int source_keep_alive_parse(char *buff, int len)
 		if(memcmp(&buff[i], "sourcekplv=ok", 13) == 0)
 		{
 
-			 printf("find sourcekplv=true \n");
+		//	 printf("find sourcekplv=true \n");
 			 return TRUE;
 		}
 
@@ -474,7 +474,7 @@ int sipuri_parse(char *buff, int len, char *sipuri)
 			 cnt = i;
 			 flag = 1;
 			 i=i+7;
-			 printf("find sipuri \n");
+	//		 printf("find sipuri \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -510,7 +510,7 @@ int jftcpstring_parse(char *buff, int len, char *jftcp)
 			 cnt = i;
 			 flag = 1;
 			 i=i+12;
-			 printf("find sipuri \n");
+	//		 printf("find sipuri \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -547,7 +547,7 @@ int request_address(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+9;
-			 printf("find reqadd=ok \n");
+		//	 printf("find reqadd=ok \n");
 			 return 1;
 		}
 
@@ -571,7 +571,7 @@ int callid_parse(char *buff, int len, char *callid)
 			 cnt = i;
 			 flag = 1;
 			 i=i+7;
-			 printf("find callid \n");
+		//	 printf("find callid \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -610,7 +610,7 @@ int sink_dst_uri_parse(char *buff, int len, char *dst_ip, int *dst_port)
 			 cnt = i;
 			 flag = 1;
 			 i=i+11;
-			 printf("find sinkdsturi \n");
+			// printf("find sinkdsturi \n");
 		}
 
 		if((flag == 1) && (buff[i+1]== 0x3b))
@@ -618,7 +618,7 @@ int sink_dst_uri_parse(char *buff, int len, char *dst_ip, int *dst_port)
 		//	printf(" buff[i] = %02x\n",  buff[i]);
 			*dst_port =   atoi(port);
 
-			printf("sink dst port = %d \n" ,*dst_port);
+		//	printf("sink dst port = %d \n" ,*dst_port);
 			return 1;
 			break;
 		}
@@ -660,7 +660,7 @@ int sink_dst_ip_parse(char *buff, int len, char *dst_ip)
 			 cnt = i;
 			 flag = 1;
 			 i=i+10;
-			 printf("find sinkdstip \n");
+		//	 printf("find sinkdstip \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -697,7 +697,7 @@ int sink_src_ip_parse(char *buff, int len, char *dst_ip)
 			 cnt = i;
 			 flag = 1;
 			 i=i+10;
-			 printf("find sinksrcip \n");
+		//	 printf("find sinksrcip \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -734,7 +734,7 @@ int source_src_ip_parse(char *buff, int len, char *dst_ip)
 			 cnt = i;
 			 flag = 1;
 			 i=i+12;
-			 printf("find sourcesrcip \n");
+		//	 printf("find sourcesrcip \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -772,7 +772,7 @@ int source_dst_ip_parse(char *buff, int len, char *dst_ip)
 			 cnt = i;
 			 flag = 1;
 			 i=i+10;
-			 printf("find sourcedstip \n");
+	//		 printf("find sourcedstip \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -931,7 +931,7 @@ void keep_alive_string_parse(char *buff, int len, char *str)
 			 cnt = i;
 			 flag = 1;
 			 i=i+14;
-			 printf("find sndkplvstring \n");
+		//	 printf("find sndkplvstring \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
@@ -966,7 +966,7 @@ int keep_alive_string_len_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+11;
-			 printf("find sndkplvlen=%d \n", atoi(&buff[i]));
+		//	 printf("find sndkplvlen=%d \n", atoi(&buff[i]));
 		 	 return atoi(&buff[i]);
 		}
  
@@ -990,7 +990,7 @@ int invite_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+9;
-			 printf("find invite=ok \n");
+		//	 printf("find invite=ok \n");
 			 return 1;
 		}
 
@@ -1013,7 +1013,7 @@ int bye_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+6;
-			 printf("find bye=ok \n");
+	//		 printf("find bye=ok \n");
 			 return 1;
 		}
 
@@ -1036,7 +1036,7 @@ int Nat_parse(char *buff, int len)
 			 cnt = i;
 			 flag = 1;
 			 i=i+6;
-			 printf("find nat=ok \n");
+	//		 printf("find nat=ok \n");
 			 return 1;
 		}
 
