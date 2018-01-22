@@ -116,6 +116,10 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
       g_free (name);
 #endif
 	switch (GST_MESSAGE_TYPE (message)) {
+
+//	case GST_MESSAGE_ASYNC_DONE:
+//			printf("GST_MESSAGE_ASYNC_DONE \n");
+//		break;
 	case GST_MESSAGE_STATE_CHANGED:
 	{
 
@@ -126,7 +130,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		name = gst_object_get_path_string (message->src);
 		// gst_message_parse_warning (message, &err, &debug);
 
-	//	g_printerr ("message: from element %s\n", name);
+	 //	g_printerr ("message: from element %s\n", name);
 		//   if (debug != NULL)
 		//    g_printerr ("Additional debug info:\n%s\n", debug);
 
@@ -138,7 +142,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		gst_message_parse_state_changed (message, &old_state, &new_state, &pending_state);
 
 		// if (GST_MESSAGE_SRC (message) == GST_OBJECT (gst_ptr->sink->sink))
-	//	g_print ("State set to %s\n", gst_element_state_get_name (new_state));  // Need comment
+	// 	g_print ("State set to %s\n", gst_element_state_get_name (new_state));  // Need comment
 		 break;
 
 			// if (GST_MESSAGE_SRC (message) == GST_OBJECT (gst_ptr->sink->sink))
@@ -207,7 +211,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		  
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
-			sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",pt+14, gst_ptr->sip_uri);
+			sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=3;",pt+14, gst_ptr->sip_uri);
 			send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
 			g_mutex_unlock (&snd_data_mutex);
 
@@ -263,7 +267,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 
 		g_mutex_lock (&snd_data_mutex);
 		bzero(tx_buf,sizeof(tx_buf));
-		sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=3;",pt2+14, gst_ptr->sip_uri);
+		sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",pt2+14, gst_ptr->sip_uri);
 		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
 		g_mutex_unlock (&snd_data_mutex);
 
@@ -468,7 +472,7 @@ int timeout_client_check(Tcpclientsocketinfo *tcpclientsock)
 
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
-			sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=3;",tcpclientsock->callid, tcpclientsock->sipuri);
+			sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",tcpclientsock->callid, tcpclientsock->sipuri);
 			send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
 
 
@@ -610,7 +614,7 @@ void cb_tcp_client_remove(GstElement* object,GSocket* arg0, gpointer arg1, gpoin
 
 		g_mutex_lock (&snd_data_mutex);
      	bzero(tx_buf,sizeof(tx_buf));
-    	sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=3;",tcpclientsock->callid, sink->sipuri);
+    	sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",tcpclientsock->callid, sink->sipuri);
     	send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
 
 
@@ -1064,7 +1068,9 @@ exit:
 	    gst_object_unref (sinkpad);
 
 	   printf("start player \n");
-	  gst_element_set_state (gstcustom->pipeline, GST_STATE_PLAYING);
+	 //  GstStateChangeReturn tmp;
+	    gst_element_set_state (gstcustom->pipeline, GST_STATE_PLAYING);
+	// printf("GstStateChangeReturn = %d \n");
 	  return TRUE;
 
 }
@@ -1280,7 +1286,7 @@ unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
  		g_mutex_lock (&gstptr->sink_hash_mutex);
 		if(g_hash_table_remove(gstptr->sink_hashtable, sink->callid))
 		{
-			printf("remove JFTCP sink successful \n");
+			printf("remove tcpclient sink successful \n");
 		}
 		g_mutex_unlock (&gstptr->sink_hash_mutex);
 	}
@@ -2052,7 +2058,7 @@ cb_have_data (GstPad    *pad,
 
 							 Tcpclientsocketinfo *tcpclient = g_new0(Tcpclientsocketinfo, 1);
 							 g_hash_table_insert (gst_ptr->tcpsink->tcpclienthashtb, g_strdup(callid), tcpclient);  //
-							 printf("add tcp client \n");
+							 printf("add tcp server \n");
 							 g_stpcpy(tcpclient->ip, sink_dst_ip);
 							 tcpclient->port=sink_dst_port;
 							 g_stpcpy(tcpclient->callid, callid);
@@ -2183,8 +2189,8 @@ cb_have_data (GstPad    *pad,
 									 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 									 g_mutex_unlock (&snd_data_mutex);
 
-									gst_element_set_state(GST_ELEMENT (tmp->pipeline),GST_STATE_NULL);
-					//				usleep(50000);
+								 	gst_element_set_state(GST_ELEMENT (tmp->pipeline),GST_STATE_NULL);
+					    		 	usleep(5000); // solve bugs for tcp connect fail, can't quit the loop
 									printf("set status to NUll \n");
 									 //sleep(1);
 
@@ -2296,7 +2302,7 @@ cb_have_data (GstPad    *pad,
 								 g_mutex_unlock (&snd_data_mutex);
 
 								gst_element_set_state(GST_ELEMENT (tmp->pipeline),GST_STATE_NULL);
-					//			usleep(50000);
+					 		//	usleep(5000);
 								printf("set status to NUll \n");
 								 //sleep(1);
 
