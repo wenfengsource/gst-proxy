@@ -289,7 +289,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 	 printf("----gst_ptr->sip_uri %s \n", gst_ptr->sip_uri);
 	//  call thread exit
 	gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
-    usleep(50000);
+   // usleep(50000);
 	//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 	g_main_loop_quit (gst_ptr->loop);
 
@@ -355,7 +355,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		 g_mutex_lock (&snd_data_mutex);
 		 bzero(tx_buf,sizeof(tx_buf));
 		// sprintf(tx_buf,"sipuri=%s;callid=%s;getdata=false;",gst_ptr->sip_uri,gst_ptr->sink->callid);
-		 sprintf(tx_buf,"code=1000;sipuri=%s;callid=%s;port=%d;",gst_ptr->sip_uri,gst_ptr->sink->callid,GPOINTER_TO_INT(ptr));
+		 sprintf(tx_buf,"code=1000;sipuri=%s;callid=0;port=%d;",gst_ptr->sip_uri,GPOINTER_TO_INT(ptr));
 
 		 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 		 g_mutex_unlock (&snd_data_mutex);
@@ -363,7 +363,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		// printf("child thread tid = %u\n", pthread_self());
 
 		gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
-		usleep(50000);
+	//	usleep(50000);
 		//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 		g_main_loop_quit (gst_ptr->loop);
 
@@ -383,12 +383,12 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
      g_print ("Got EOS\n");
  	 g_mutex_lock (&snd_data_mutex);
   	 bzero(tx_buf,sizeof(tx_buf));
-  	 sprintf(tx_buf,"code=1000;sipuri=%s;callid=%s;port=0;",gst_ptr->sip_uri,gst_ptr->sink->callid);  //RTSP Server error, TCP sink error
+  	 sprintf(tx_buf,"code=1000;sipuri=%s;callid=0;port=0;",gst_ptr->sip_uri);  //RTSP Server error, TCP sink error
   	 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
   	 g_mutex_unlock (&snd_data_mutex);
   	//  call thread exit
    	gst_element_set_state(GST_ELEMENT (gst_ptr->pipeline),GST_STATE_NULL);
-   	usleep(50000);
+  // 	usleep(50000);
   	//	printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
   	g_main_loop_quit (gst_ptr->loop);
 
@@ -2184,7 +2184,7 @@ cb_have_data (GstPad    *pad,
 									 g_mutex_unlock (&snd_data_mutex);
 
 									gst_element_set_state(GST_ELEMENT (tmp->pipeline),GST_STATE_NULL);
-									usleep(50000);
+					//				usleep(50000);
 									printf("set status to NUll \n");
 									 //sleep(1);
 
@@ -2296,7 +2296,7 @@ cb_have_data (GstPad    *pad,
 								 g_mutex_unlock (&snd_data_mutex);
 
 								gst_element_set_state(GST_ELEMENT (tmp->pipeline),GST_STATE_NULL);
-								usleep(50000);
+					//			usleep(50000);
 								printf("set status to NUll \n");
 								 //sleep(1);
 
@@ -2425,7 +2425,7 @@ cb_have_data (GstPad    *pad,
 
 	g_main_loop_unref (gstdata->loop);
 	gst_object_unref (gstdata->pipeline);
-    usleep(5000); // here only 5ms
+ //   usleep(5000); // here only 5ms
 	// for each all sink and release udp sink snd port and keep alive socket
 	g_mutex_lock (&gstdata->sink_hash_mutex);
 	g_hash_table_foreach(gstdata->sink_hashtable, free_all_keepalive_for_sink, NULL);
