@@ -18,9 +18,9 @@
 
 #define UDP    1
 #define RTP    2
-#define TCP    3
+//#define TCP    3
 #define RTSP   4
-#define JFTCP  5
+//#define JFTCP  5
 #define TCPCLIENT 3
 #define TCPSERVER 5
 
@@ -257,7 +257,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 	if(pt2 != NULL) // tcpserversink
 	{
 		 printf("tcpserversink error message \n");
-		sink = g_hash_table_lookup (tmp->sink_hashtable, "TCP");
+		sink = g_hash_table_lookup (tmp->sink_hashtable, pt2+14);
 		if(sink == NULL)
 		{
 			g_free (ele_name);
@@ -426,15 +426,15 @@ void cb_udp_client_remove  (GstElement* object, gchararray arg0, gint arg1, gpoi
 	printf("remove arg1 = %d \n", arg1);
 }
 
-int tcp_client_remove(Sink *sink)
-{
-    ///GSocket *sock;
-    Tcpclientsocketinfo *tcpclientsock = g_hash_table_lookup (sink->tcpclienthashtb,sink->callid);
-    if(tcpclientsock != NULL && tcpclientsock->sock != NULL)
-	{
-    	g_signal_emit_by_name(sink->sink,"remove", tcpclientsock->sock);
-	}
-}
+//int tcp_client_remove(Sink *sink)
+//{
+//    ///GSocket *sock;
+//    Tcpclientsocketinfo *tcpclientsock = g_hash_table_lookup (sink->tcpclienthashtb,sink->callid);
+//    if(tcpclientsock != NULL && tcpclientsock->sock != NULL)
+//	{
+//    	g_signal_emit_by_name(sink->sink,"remove", tcpclientsock->sock);
+//	}
+//}
 
 int cb_tcp_not_our_client_remove(Sink *sink)
 {
@@ -448,57 +448,57 @@ int cb_tcp_not_our_client_remove(Sink *sink)
 	return FALSE;
 }
 
-int timeout_client_check(Tcpclientsocketinfo *tcpclientsock)
-{
-    ///GSocket *sock;
-   // Tcpclientsocketinfo *tcpclientsock = g_hash_table_lookup (sink->tcpclienthashtb,sink->callid);
-
-	if(tcpclientsock != NULL)
-	{
-		if(tcpclientsock->sock == NULL)
-		{
-			printf("Client not connect, close the client \n");
-
-			// Accord sipuri search how many callid session
-		  	int sink_size = 0;
-			g_mutex_lock (&gst_mutex);
-			GstCustom *tmp = g_hash_table_lookup (gsthashtbale, tcpclientsock->sipuri);
-			g_mutex_unlock (&gst_mutex);
-
-			g_mutex_lock (&(tmp->sink_hash_mutex));
-			sink_size = g_hash_table_size(tmp->sink_hashtable);
-			g_mutex_unlock (&(tmp->sink_hash_mutex));
-
-
-			g_mutex_lock (&snd_data_mutex);
-			bzero(tx_buf,sizeof(tx_buf));
-			sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",tcpclientsock->callid, tcpclientsock->sipuri);
-			send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
-
-
-			bzero(tx_buf,sizeof(tx_buf));
-			if(sink_size == 1 && tmp->tcpsink->tcp_client_count == 1)
-			{
-				sprintf(tx_buf, "sipuri=%s;callid=%s;last=yes;notgotkeepalivesignal;",tcpclientsock->sipuri,tcpclientsock->callid);
-			}
-			else
-			{
-				sprintf(tx_buf, "sipuri=%s;callid=%s;last=no;notgotkeepalivesignal;",tcpclientsock->sipuri,tcpclientsock->callid);
-			}
-			send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
-			g_mutex_unlock (&snd_data_mutex);
-		}
-		else
-		{
-			printf("tcp client connect \n");
-		}
-	}
-
-
-
-
-	return FALSE;
-}
+//int timeout_client_check(Tcpclientsocketinfo *tcpclientsock)
+//{
+//    ///GSocket *sock;
+//   // Tcpclientsocketinfo *tcpclientsock = g_hash_table_lookup (sink->tcpclienthashtb,sink->callid);
+//
+//	if(tcpclientsock != NULL)
+//	{
+//		if(tcpclientsock->sock == NULL)
+//		{
+//			printf("Client not connect, close the client \n");
+//
+//			// Accord sipuri search how many callid session
+//		  	int sink_size = 0;
+//			g_mutex_lock (&gst_mutex);
+//			GstCustom *tmp = g_hash_table_lookup (gsthashtbale, tcpclientsock->sipuri);
+//			g_mutex_unlock (&gst_mutex);
+//
+//			g_mutex_lock (&(tmp->sink_hash_mutex));
+//			sink_size = g_hash_table_size(tmp->sink_hashtable);
+//			g_mutex_unlock (&(tmp->sink_hash_mutex));
+//
+//
+//			g_mutex_lock (&snd_data_mutex);
+//			bzero(tx_buf,sizeof(tx_buf));
+//			sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",tcpclientsock->callid, tcpclientsock->sipuri);
+//			send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
+//
+//
+//			bzero(tx_buf,sizeof(tx_buf));
+//			if(sink_size == 1 && tmp->tcpsink->tcp_client_count == 1)
+//			{
+//				sprintf(tx_buf, "sipuri=%s;callid=%s;last=yes;notgotkeepalivesignal;",tcpclientsock->sipuri,tcpclientsock->callid);
+//			}
+//			else
+//			{
+//				sprintf(tx_buf, "sipuri=%s;callid=%s;last=no;notgotkeepalivesignal;",tcpclientsock->sipuri,tcpclientsock->callid);
+//			}
+//			send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
+//			g_mutex_unlock (&snd_data_mutex);
+//		}
+//		else
+//		{
+//			printf("tcp client connect \n");
+//		}
+//	}
+//
+//
+//
+//
+//	return FALSE;
+//}
 
 
 
@@ -544,16 +544,44 @@ void cb_tcp_client_add  (GstElement* object, GSocket *arg0, gpointer user_data)
 	//printf("size = %d \n",g_hash_table_size(sink->tcpclienthashtb));
 	//printf( "tcpclienthashtb address = %p \n",  sink->tcpclienthashtb);
 
+	int port ;
+		 GInetSocketAddress *addr =
+			        G_INET_SOCKET_ADDRESS (g_socket_get_remote_address (arg0,
+			            NULL));
+			    gchar *ip =
+			        g_inet_address_to_string (g_inet_socket_address_get_address (addr));
+			    port = g_inet_socket_address_get_port (addr);
+		    printf ( "added new--- client ip %s:%u with socket %p \n",
+			         ip, port, user_data);
 
-	if(sink != NULL && sink->tcpclienthashtb !=NULL && g_hash_table_find(sink->tcpclienthashtb, find_key_function, arg0) == NULL)
-	{
-		backup_element = object;
-		backup_sock = arg0;
+			    g_object_unref (addr);
 
-		printf("added client is not assigned tcp client \n");
-	//	g_timeout_add(10,cb_tcp_not_our_client_remove,NULL);  // comment for test
-		//g_signal_emit_by_name(object,"remove", arg0);
-	}
+
+			    printf("sink->dst_ip = %s port= %d \n",sink->dst_ip,sink->dst_port);
+			    if(g_strcmp0(ip, sink->dst_ip) == 0 && port == sink->dst_port)
+				{
+			    	printf("tcp client is we assigned client \n");
+			    	//g_signal_emit_by_name(object,"remove", arg0);
+			    	//tcpclientsock->sock = (GSocket*) user_data;
+			    	//return 1;
+				}
+			    else
+			    {
+			    	printf("tcp client is not we assigned client \n");
+			    }
+
+			    g_free (ip);
+
+			    return;
+//	if(sink != NULL && sink->tcpclienthashtb !=NULL && g_hash_table_find(sink->tcpclienthashtb, find_key_function, arg0) == NULL)
+//	{
+//		backup_element = object;
+//		backup_sock = arg0;
+//
+//		printf("added client is not assigned tcp client \n");
+//	//	g_timeout_add(10,cb_tcp_not_our_client_remove,NULL);  // comment for test
+//		//g_signal_emit_by_name(object,"remove", arg0);
+//	}
 
  	//g_signal_emit_by_name(object,"get-stats", arg0);
 
@@ -585,10 +613,48 @@ void cb_tcp_client_add  (GstElement* object, GSocket *arg0, gpointer user_data)
 
 void cb_tcp_client_remove(GstElement* object,GSocket* arg0, gpointer arg1, gpointer user_data)
 {
-	printf(" tcp111 client remove arg0= \n");
+	//printf(" tcp111 client remove arg0= \n");
 	Sink *sink = (Sink *)user_data;
 	gpointer item_ptr = NULL;
 
+
+	int port ;
+		 GInetSocketAddress *addr =
+			        G_INET_SOCKET_ADDRESS (g_socket_get_remote_address (arg0,
+			            NULL));
+			    gchar *ip =
+			        g_inet_address_to_string (g_inet_socket_address_get_address (addr));
+			    port = g_inet_socket_address_get_port (addr);
+		    printf ( "remove client ip %s:%u with socket %p \n",
+			         ip, port, user_data);
+
+			    g_object_unref (addr);
+
+
+
+//			    if(g_strcmp0(ip, tcpclientsock->ip) == 0 && port == tcpclientsock->port)
+//				{
+//			    	printf("tcp client is we assigned client \n");
+//			    	//g_signal_emit_by_name(object,"remove", arg0);
+//			    	tcpclientsock->sock = (GSocket*) user_data;
+//			    	return 1;
+//				}
+
+			    g_free (ip);
+
+
+				g_mutex_lock (&snd_data_mutex);
+				bzero(tx_buf,sizeof(tx_buf));
+				sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",sink->callid, sink->sipuri);
+				send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
+
+				bzero(tx_buf,sizeof(tx_buf));
+				sprintf(tx_buf, "code=1001;sipuri=%s;callid=%s;",sink->sipuri,sink->callid);
+				send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
+				g_mutex_unlock (&snd_data_mutex);
+
+     return;
+#if 0
 	if(sink->tcpclienthashtb == NULL)
 		return;
 
@@ -646,7 +712,7 @@ void cb_tcp_client_remove(GstElement* object,GSocket* arg0, gpointer arg1, gpoin
 //
 //			    g_free (ip);
 //			    g_object_unref (addr);
-
+#endif
 }
 
 
@@ -1010,10 +1076,11 @@ exit:
 	    	gstcustom->sink->sink = gst_element_factory_make ("tcpserversink", tmp);
 	    	g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->src_port, NULL);  // Listen port
 	    	g_object_set (gstcustom->sink->sink, "host", "0.0.0.0", NULL);
-	     	g_object_set (gstcustom->sink->sink, "timeout", 5000000000, NULL);
+	     	g_object_set (gstcustom->sink->sink, "timeout", 2000000000, NULL);  // client is not inactivity timeout: 2s
+	     	g_object_set (gstcustom->sink->sink, "client-connect-timeout", 10, NULL); // client connect timeout : 10s
 
-	    	g_signal_connect (gstcustom->sink->sink, "client-added",G_CALLBACK (cb_tcp_client_add), gstcustom->tcpsink);
-	    	g_signal_connect (gstcustom->sink->sink, "client-removed",G_CALLBACK (cb_tcp_client_remove), gstcustom->tcpsink);
+	    	g_signal_connect (gstcustom->sink->sink, "client-added",G_CALLBACK (cb_tcp_client_add), gstcustom->sink);
+	    	g_signal_connect (gstcustom->sink->sink, "client-removed",G_CALLBACK (cb_tcp_client_remove),  gstcustom->sink);
 	    //	g_signal_connect (gstcustom->sink->sink, "client-socket-removed",G_CALLBACK (cb_tcp_client_socket_remove), gstcustom);
 
 
@@ -1106,6 +1173,9 @@ int Linksink_to_pipeline(GstCustom *gstcustom, Sink *sink)
 				return -1;
 			}
 			g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);
+
+			g_object_set (gstcustom->sink->sink, "timeout", 2000000000, NULL);  // client is not inactivity timeout: 2s
+			g_object_set (gstcustom->sink->sink, "client-connect-timeout", 10, NULL); // client connect timeout : 10s
 
 			g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->src_port, NULL);
 			g_object_set (gstcustom->sink->sink, "host", "0.0.0.0", NULL);
@@ -1277,11 +1347,11 @@ unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 		 g_mutex_unlock (&gstptr->sink_hash_mutex);
 
 		 g_mutex_lock (&sink_snd_port_mutex);
-		 g_hash_table_remove(Hashtbl_udp_sink_snd_port,sink->callid);  // remove send port for sink
+		 g_hash_table_remove(Hashtbl_udp_sink_snd_port,sink->callid);  // remove udp send port for sink
 		 g_mutex_unlock (&sink_snd_port_mutex);
 
 	}
-	else if( sink->type == TCPCLIENT)
+	else if( sink->type == TCPCLIENT || sink->type == TCPSERVER)
 	{
  		g_mutex_lock (&gstptr->sink_hash_mutex);
 		if(g_hash_table_remove(gstptr->sink_hashtable, sink->callid))
@@ -1289,9 +1359,15 @@ unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 			printf("remove tcpclient sink successful \n");
 		}
 		g_mutex_unlock (&gstptr->sink_hash_mutex);
-	}
 
-	else if(sink->type == TCPSERVER)
+		 g_mutex_lock (&sink_snd_port_mutex);
+		 g_hash_table_remove(Hashtbl_Tcp_sink_snd_port,sink->callid);  // remove udp send port for sink
+		 g_mutex_unlock (&sink_snd_port_mutex);
+
+	}
+#if 0
+	else if(0)
+	//else if(sink->type == TCPSERVER)
 	 {
 		if(gstptr->tcpsink != NULL && gstptr->tcpsink->tcpclienthashtb !=NULL)
 		{
@@ -1314,7 +1390,7 @@ unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 		}
 		 g_mutex_unlock (&gstptr->sink_hash_mutex);
 	 }
-
+#endif
 	return GST_PAD_PROBE_REMOVE;
 }
 
@@ -1623,7 +1699,9 @@ cb_have_data (GstPad    *pad,
 #endif
 
 			}
-			else if(sink_type == TCPSERVER)
+#if 0
+			else if(0)
+			//else if(sink_type == TCPSERVER)
 			{
 				ptr = NULL;
 				g_mutex_lock (&sink_snd_port_mutex);
@@ -1677,7 +1755,8 @@ cb_have_data (GstPad    *pad,
 #endif
 
 			}
-			else if(sink_type == TCPCLIENT)
+#endif
+			else if(sink_type == TCPCLIENT || sink_type == TCPSERVER)
 			{
 				ptr = NULL;
 				g_mutex_lock (&sink_snd_port_mutex);
@@ -1828,7 +1907,7 @@ cb_have_data (GstPad    *pad,
 				if(tmp != 0)  // src session id is esstibition
 				{
 				//	printf("find %s \n", sipuri);
-					if(sink_type == UDP || sink_type == TCPCLIENT)
+					if(sink_type == UDP || sink_type == TCPCLIENT || sink_type== TCPSERVER)
 					{
 
 							printf("find the same sipuri, attach the new sink to sipuri %s \n", sipuri);
@@ -1897,11 +1976,13 @@ cb_have_data (GstPad    *pad,
 					{
 
 					}
-					else if(sink_type == TCPSERVER)  // TCP output
+#if 0
+					else if(0)
+					//else if(sink_type == TCPSERVER)  // TCP Server output
 					{
 						 if(tmp->tcpsink == NULL)
 						 {
-							 //Create tcp sink
+							 //Create tcpserver sink
 							 Sink *sink;
 
 							 sink  = g_new0(Sink, 1);
@@ -1965,6 +2046,7 @@ cb_have_data (GstPad    *pad,
 							// g_timeout_add_seconds(30,timeout_client_check ,tcpclient);   // TCP client must connect less than 30ms
 						 }
 					}
+#endif
 				}
 				else     // src session is not build, create new pipeline
 				{
@@ -2013,7 +2095,7 @@ cb_have_data (GstPad    *pad,
 						 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_sink_key,  free_sink_value );
 						 g_mutex_init (&gst_ptr->sink_hash_mutex);
 
-						 if(sink_type == UDP || sink_type == RTP || sink_type ==TCPCLIENT)
+						 if(sink_type == UDP || sink_type == RTP || sink_type ==TCPCLIENT ||  sink_type == TCPSERVER)
 						 {
 							 g_mutex_lock (&gst_ptr->sink_hash_mutex);
 							 g_hash_table_insert (gst_ptr->sink_hashtable, g_strdup(callid), gst_ptr->sink);
@@ -2043,9 +2125,9 @@ cb_have_data (GstPad    *pad,
 						// char dst_uri[50];
 						// sprintf(dst_uri,"%s:%d",sink_dst_ip,sink_dst_port);
 						 //gst_ptr->sink->Address_list = g_list_append(gst_ptr->sink->Address_list, dst_uri);
-
-
-						 else if(sink_type == TCPSERVER)  // Backup tcp sink
+#if 0
+						 else if(0)
+						// else if(sink_type == TCPSERVER)  // Backup tcp sink
 						 {
 							 g_mutex_lock (&gst_ptr->sink_hash_mutex);
 							 g_hash_table_insert (gst_ptr->sink_hashtable, g_strdup("TCP"), gst_ptr->sink);
@@ -2069,7 +2151,7 @@ cb_have_data (GstPad    *pad,
 							// printf( "sink address = %p \n", gst_ptr->tcpsink);
 							 printf( "tcpclienthashtb address = %p \n",  gst_ptr->tcpsink->tcpclienthashtb);
 						 }
-
+#endif
 						 gst_ptr->gthread  = g_thread_new("jieshouip:port", new_pipeline_thread , gst_ptr);
 
 					}
@@ -2127,10 +2209,10 @@ cb_have_data (GstPad    *pad,
 					}
 					else
 					{
-						sink_type = TCP;
+						sink_type = TCPSERVER;
 					}
 
-				 	if(sink_type == UDP || sink_type == TCPCLIENT)
+				 	if(sink_type == UDP || sink_type == TCPCLIENT || sink_type == TCPSERVER)
 					{
 
 					//	printf("remove sink type ==1 \n");
@@ -2232,7 +2314,9 @@ cb_have_data (GstPad    *pad,
 							printf("not find sink callid =%s\n",callid);
 						}
 					}
-				 	else if(sink_type == TCPSERVER && tmp->tcpsink != NULL)
+#if 0
+				 	else if(0)
+				 //	else if(sink_type == TCPSERVER && tmp->tcpsink != NULL)
 				 	{
 						tmp->sink = tmp->tcpsink;
 
@@ -2338,6 +2422,7 @@ cb_have_data (GstPad    *pad,
 							}
 				 		}
 				 	}
+#endif
 				 	else
 				 	{
 				 		printf("bye --not find callid =%s \n", callid);
@@ -2370,7 +2455,7 @@ cb_have_data (GstPad    *pad,
 		 g_mutex_unlock (&sink_snd_port_mutex);
 		 rmv_keepalive_socket_for_sink(sink);
 	 }
-	 else if(sink->type == TCPCLIENT)
+	 else if(sink->type == TCPCLIENT || sink->type == TCPSERVER)
 	 {	
 		g_mutex_lock (&sink_snd_port_mutex);
 		g_hash_table_remove(Hashtbl_Tcp_sink_snd_port,sink->callid); 
@@ -2441,9 +2526,9 @@ cb_have_data (GstPad    *pad,
 
 
   //   rmv_keepalive_socket_for_source(gstdata);
-
-
-	 if(gstdata->tcpsink != NULL)
+#if 0
+    if(0)
+	// if(gstdata->tcpsink != NULL)
 	 {
 
 		// Release the tcp sink (server) port
@@ -2461,7 +2546,7 @@ cb_have_data (GstPad    *pad,
 			 gstdata->tcpsink = NULL;
 		 }
 	 }
-
+#endif
 
 	 //end thread, destory hash table
 

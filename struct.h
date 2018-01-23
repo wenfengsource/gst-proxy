@@ -81,7 +81,7 @@ typedef struct
   //GList *Address_list;
   char jftcpstring[301];
  // Tcpclientsocketinfo  *tcpclientsock;
-  GHashTable *tcpclienthashtb;   // call id as key SinkAddress as value
+ // GHashTable *tcpclienthashtb;   // call id as key SinkAddress as value
 } Sink;
 
 typedef struct

@@ -13,6 +13,9 @@ multi_thread:
 	gcc multi_thread.c cmd_rcv.c hashtable.c -o multi_thread `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gio-2.0`
 
 
+multi_test:
+	gcc multi_test.c cmd_rcv.c hashtable.c -o multi_thread `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gio-2.0`
+
 gst-proxy:
 	gcc proxy.c -o gst-proxy `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gstreamer-mpegts-1.0 `
 
