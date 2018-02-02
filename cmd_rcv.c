@@ -859,6 +859,24 @@ int rcv_ip_parse(char *buff, int len, char *dst_ip)
 	return 0;
 }
 
+int audio_codec_parse(char *buff, int len)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	int flag =0;
+
+    if(strstr(buff,"AUDIO_CODEC=AAC"))
+	{
+    	return 1;   // CODEC_AAC
+	}
+    else if(strstr(buff,"AUDIO_CODEC=AAC"))
+    {
+    	return 2;   // CODEC_PCMULAW
+    }
+    // default
+	return 2;
+}
+
 
 int control_ip_parse(char *buff, int len, char *dst_ip)
 {

@@ -15,6 +15,9 @@
 #include "hashtable.h"
 #include "struct.h"
 
+//#define LOGSAVE
+
+#define VERSION                                 "1.0.0"
 
 #define UDP    1
 #define RTP    2
@@ -55,9 +58,13 @@ static char g_rcv_ip[20];
 unsigned char tx_buf[1500];
 unsigned char rx_buf[1500];
 
-#define SND_PORT_ACK   50000
-#define SND_PORT       50002
+#define SND_PORT_ACK   50000   //
+#define LISTEN_PORT    50001   // receive command port num
+#define SND_PORT       50002   //
 
+#define CODEC_AAC     1
+#define CODEC_PCMULAW  2
+int g_audio_codec= CODEC_PCMULAW ;
 int cnt;
 
 GHashTable *Hashtbl_Udp_Source_rcv_port; // sipuri and port
@@ -130,7 +137,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		name = gst_object_get_path_string (message->src);
 		// gst_message_parse_warning (message, &err, &debug);
 
-	 //	g_printerr ("message: from element %s\n", name);
+ 	 //  g_printerr ("message: from element %s\n", name);
 		//   if (debug != NULL)
 		//    g_printerr ("Additional debug info:\n%s\n", debug);
 
@@ -142,7 +149,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		gst_message_parse_state_changed (message, &old_state, &new_state, &pending_state);
 
 		// if (GST_MESSAGE_SRC (message) == GST_OBJECT (gst_ptr->sink->sink))
-	// 	g_print ("State set to %s\n", gst_element_state_get_name (new_state));  // Need comment
+	 //	g_print ("State set to %s\n", gst_element_state_get_name (new_state));  // Need comment
 		 break;
 
 			// if (GST_MESSAGE_SRC (message) == GST_OBJECT (gst_ptr->sink->sink))
@@ -211,14 +218,14 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		  
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
-			sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=3;",pt+14, gst_ptr->sip_uri);
-			send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
+			sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;sinktype=3;",pt+14, gst_ptr->sip_uri);
+			send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
 			g_mutex_unlock (&snd_data_mutex);
 
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
 			sprintf(tx_buf,"code=1003;sipuri=%s;callid=%s;",gst_ptr->sip_uri,pt+13);
-			send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
+			send_packet(tx_buf,strlen(tx_buf),g_remote_ip,LISTEN_PORT);
 			g_mutex_unlock (&snd_data_mutex);
 			
 			g_free (ele_name);
@@ -239,8 +246,8 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 
 		g_mutex_lock (&snd_data_mutex);
 		bzero(tx_buf,sizeof(tx_buf));
-		sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=1;",pt1+13, gst_ptr->sip_uri);
-		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
+		sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;sinktype=1;",pt1+13, gst_ptr->sip_uri);
+		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
 		g_mutex_unlock (&snd_data_mutex);
 
 		g_mutex_lock (&snd_data_mutex);
@@ -267,8 +274,8 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 
 		g_mutex_lock (&snd_data_mutex);
 		bzero(tx_buf,sizeof(tx_buf));
-		sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",pt2+14, gst_ptr->sip_uri);
-		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
+		sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;sinktype=5;",pt2+14, gst_ptr->sip_uri);
+		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
 		g_mutex_unlock (&snd_data_mutex);
 
 		g_mutex_lock (&snd_data_mutex);
@@ -286,7 +293,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 
 	 g_mutex_lock (&snd_data_mutex);
 	 bzero(tx_buf,sizeof(tx_buf));
-	 sprintf(tx_buf,"code=1000;sipuri=%s;callid=%s;port=0",gst_ptr->sink->callid,gst_ptr->sip_uri);
+	 sprintf(tx_buf,"code=1000;sipuri=%s;callid=0;port=0",gst_ptr->sip_uri);
 
 	 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 	 g_mutex_unlock (&snd_data_mutex);
@@ -500,7 +507,7 @@ int cb_tcp_not_our_client_remove(Sink *sink)
 //	return FALSE;
 //}
 
-
+#if 0
 
 int find_key_function (gpointer key, gpointer value, gpointer user_data)
 {
@@ -534,6 +541,7 @@ int find_key_function (gpointer key, gpointer value, gpointer user_data)
 
 		return 0;
 }
+#endif
 
 void cb_tcp_client_add  (GstElement* object, GSocket *arg0, gpointer user_data)
 {
@@ -625,7 +633,7 @@ void cb_tcp_client_remove(GstElement* object,GSocket* arg0, gpointer arg1, gpoin
 			    gchar *ip =
 			        g_inet_address_to_string (g_inet_socket_address_get_address (addr));
 			    port = g_inet_socket_address_get_port (addr);
-		    printf ( "remove client ip %s:%u with socket %p \n",
+		    printf ( "remove client=== ip %s:%u with socket %p \n",
 			         ip, port, user_data);
 
 			    g_object_unref (addr);
@@ -645,8 +653,8 @@ void cb_tcp_client_remove(GstElement* object,GSocket* arg0, gpointer arg1, gpoin
 
 				g_mutex_lock (&snd_data_mutex);
 				bzero(tx_buf,sizeof(tx_buf));
-				sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=5;",sink->callid, sink->sipuri);
-				send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);
+				sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;sinktype=5;",sink->callid, sink->sipuri);
+				send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
 
 				bzero(tx_buf,sizeof(tx_buf));
 				sprintf(tx_buf, "code=1001;sipuri=%s;callid=%s;",sink->sipuri,sink->callid);
@@ -979,34 +987,74 @@ exit:
 			gstcustom->source.src = gst_element_factory_make ("rtspsrc", "rtspsrc");
 			gstcustom->source.h264depay = gst_element_factory_make ("rtph264depay", "rtph264depay");
 			gstcustom->source.h264parse = gst_element_factory_make ("h264parse", "h264parse");
-			gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
+
 			gstcustom->source.mpegtsmux = gst_element_factory_make ("mpegtsmux", "mpegtsmux");
 			gstcustom->source.tee = gst_element_factory_make ("tee", "tee");
+
+			if(g_audio_codec==CODEC_AAC)
+			{
+				gstcustom->source.aacparse = gst_element_factory_make ("aacparse", "aacparse");
+				gstcustom->source.audiodepay = gst_element_factory_make ("rtpmp4gdepay", "rtpmp4gdepay");
+
+
+			//	gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
+
+				if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
+								|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.tee) {
+								g_error ("Failed to create elements");
+								return -1;
+				}
+
+
+				gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,
+						gstcustom->source.aacparse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.tee,NULL);
+
+				if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.tee, NULL))
+				{
+					g_error ("Failed to link elements");
+					return -2;
+				}
+				if (!gst_element_link_many ( gstcustom->source.audiodepay,gstcustom->source.aacparse,gstcustom->source.mpegtsmux, NULL))
+				{
+					g_error ("Failed to link elements");
+					return -2;
+				}
+			}
+			else if(g_audio_codec==CODEC_PCMULAW)
+			{
+				gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
+
+				if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
+								|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.tee) {
+								g_error ("Failed to create elements");
+								return -1;
+				}
+
+
+				gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.tee,NULL);
+				if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.tee, NULL))
+				{
+					g_error ("Failed to link elements");
+					return -2;
+				}
+				if (!gst_element_link_many ( gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, NULL))
+				{
+					g_error ("Failed to link elements");
+					return -2;
+				}
+
+			}
+
 		//	gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
 		//	gstcustom->source.capsfilter = gst_element_factory_make ("capsfilter", "capsfilter");
 
-			if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
-				|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.tee) {
-				g_error ("Failed to create elements");
-				return -1;
-			}
+
 
 
 			//g_object_set (src, "caps", gst_caps_new_simple("application/x-rtp", "media", G_TYPE_STRING,"video","payload",G_TYPE_INT,33, NULL), NULL);
 			//g_object_set (gstcustom->source.capsfilter , "caps", gst_caps_new_simple("video/mpegts", "packetsize",G_TYPE_INT,188, NULL), NULL);
 
 
-			gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.tee,NULL);
-		if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.tee, NULL))
-		{
-			g_error ("Failed to link elements");
-			return -2;
-		}
-		if (!gst_element_link_many ( gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, NULL))
-		{
-			g_error ("Failed to link elements");
-			return -2;
-		}
 
 		 g_signal_connect (gstcustom->source.src, "pad-added", (GCallback)pad_added_handler_for_rtsp, gstcustom);
 
@@ -1076,7 +1124,7 @@ exit:
 	    	gstcustom->sink->sink = gst_element_factory_make ("tcpserversink", tmp);
 	    	g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->src_port, NULL);  // Listen port
 	    	g_object_set (gstcustom->sink->sink, "host", "0.0.0.0", NULL);
-	     	g_object_set (gstcustom->sink->sink, "timeout", 2000000000, NULL);  // client is not inactivity timeout: 2s
+	     	g_object_set (gstcustom->sink->sink, "timeout", 20000000000, NULL);  // client is not inactivity timeout: 20s
 	     	g_object_set (gstcustom->sink->sink, "client-connect-timeout", 10, NULL); // client connect timeout : 10s
 
 	    	g_signal_connect (gstcustom->sink->sink, "client-added",G_CALLBACK (cb_tcp_client_add), gstcustom->sink);
@@ -1174,7 +1222,7 @@ int Linksink_to_pipeline(GstCustom *gstcustom, Sink *sink)
 			}
 			g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);
 
-			g_object_set (gstcustom->sink->sink, "timeout", 2000000000, NULL);  // client is not inactivity timeout: 2s
+			g_object_set (gstcustom->sink->sink, "timeout", 20000000000, NULL);  // client is not inactivity timeout: 20s
 			g_object_set (gstcustom->sink->sink, "client-connect-timeout", 10, NULL); // client connect timeout : 10s
 
 			g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->src_port, NULL);
@@ -1413,6 +1461,9 @@ cb_have_data (GstPad    *pad,
 	signal(SIGINT, Stop);
 	char remote_ip[20];
 	//printf("cmd thread created \n");
+
+
+	 fflush(stdout);
 
 	rcv_size = len;
 	//gRcvSocket = rcv_socket_init();
@@ -1821,7 +1872,7 @@ cb_have_data (GstPad    *pad,
 		    sprintf(tx_buf,"sipuri=%s;callid=%s;sourcedstip=%s;sourcedstport=%d;sinksrcip=%s;sinksrcport=%d",sipuri,callid,g_nat_ip,rcv_port,g_nat_ip,snd_port);
 		    send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT_ACK);
 		    g_mutex_unlock (&snd_data_mutex);
-		    printf("tx_buf -----%s \n", tx_buf);
+		 //   printf("tx_buf -----%s \n", tx_buf);
 		    return 0;
 			//continue;
 		}
@@ -2746,9 +2797,9 @@ keep_alive_timed_out_cb (GSocket      *client,
 
        // send bye message to local
      	bzero(tx_buf,sizeof(tx_buf));
-    	sprintf(tx_buf, "callid=%s;sipuri=%s;bye=ok;sinktype=1;",sink->callid,sink->sipuri);
+    	sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;sinktype=1;",sink->callid,sink->sipuri);
     	printf("========================== \n");
-      	send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",50000);  // comment for test
+      	send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);  // comment for test
     	g_mutex_unlock (&snd_data_mutex);
 
     	return TRUE;
@@ -3076,7 +3127,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 	 	g_assert(err == NULL);
 	 //	g_inet_socket_address_new
 	 	g_socket_bind(g_socket,
-	 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string("0.0.0.0") ,50000)),
+	 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string("0.0.0.0") ,LISTEN_PORT)),
 	 	              TRUE,
 	 	              &err);
 
@@ -3129,6 +3180,18 @@ int time_ticket()
 int  main (int argc, char **argv)
 {
 	//  GMainContext *context;
+
+#ifdef LOGSAVE
+	 fflush(stdout);
+	 setvbuf(stdout,NULL,_IONBF,0);
+	 printf("test stdout\n");
+	 freopen("time.log","w",stdout); //注: 不要使用这类的代码 stdout = fopen("test1.txt","w");   这样的话输出很诡异的. 最好使用  freopen 这类的函数来替换它.
+	 printf("test file\n");
+	 fflush(stdout);
+#endif
+//	 freopen("/dev/tty","w",stdout);
+//	 printf("test tty\n");
+
 	FILE *fp = NULL;
 	//GstCustom gstdata;
 
@@ -3136,6 +3199,7 @@ int  main (int argc, char **argv)
 	 //   source = g_timeout_source_new(1000);
 	 g_stpcpy(g_remote_ip, "192.168.128.151");
 
+    printf("Mdeia_Distribute Version=%s",VERSION);
 
 	fp = fopen("./mediaproxy.cfg", "rb");
 
@@ -3166,6 +3230,9 @@ int  main (int argc, char **argv)
 		fclose(fp);
 		return 1;
 	}
+
+	g_audio_codec= audio_codec_parse(tx_buf, size);
+
 	rcv_port_min = rcv_min_port_parse(tx_buf, size);
 	Cur_Rcv_Udp_Port = rcv_port_min;
 	Cur_Rcv_Tcp_Port = rcv_port_min;
