@@ -11,36 +11,26 @@
 #include <gio/gio.h>
 
 
-typedef struct
-{
-	gint source_id;  //check headbeat
-	GIOChannel* io_channel;
-}Heatbeat;
+//typedef struct
+//{
+//	gint source_id;  //check headbeat
+//	GIOChannel* io_channel;
+//}Heatbeat;
 
 
-
-typedef struct
-{
-//	char src_ip[20];
-	char dst_ip[20];
-//	int src_port;
-	int dst_port;
-	int keep_alive;
-	int time_cnt;
-//	int sock_fd;
-	char callid[100];
-}SinkAddress;
-
-
-typedef struct
-{
-	GSocket *sock;
-	char ip[20];
-	int port;
-	char callid[100];
-	char sipuri[100];
-}Tcpclientsocketinfo;
-
+//
+//typedef struct
+//{
+////	char src_ip[20];
+//	char dst_ip[20];
+////	int src_port;
+//	int dst_port;
+//	int keep_alive;
+//	int time_cnt;
+////	int sock_fd;
+//	char callid[100];
+//}SinkAddress;
+//
 
 typedef struct
 {
@@ -59,9 +49,9 @@ typedef struct
   int src_port;
   char src_ip[20];
 
-  char callid[100];
+ // char callid[100];
 
-  char sipuri[100];
+  //char sipuri[100];
 
   int src_fd;  // socket used for receive keep_alive data
   int keep_alive_flag;
@@ -76,12 +66,12 @@ typedef struct
   int Nat_Traversal;  // NAT
   int Get_Nat_address_flag;
   //GHashTable Multi_Address; //  address as key, keep_live as value
-  int tcp_client_count;
+  //int tcp_client_count;
   //int tcp_client_callid;
   //GList *Address_list;
   char jftcpstring[301];
  // Tcpclientsocketinfo  *tcpclientsock;
-  GHashTable *tcpclienthashtb;   // call id as key SinkAddress as value
+  //GHashTable *tcpclienthashtb;   // call id as key SinkAddress as value
 } Sink;
 
 typedef struct
@@ -106,7 +96,7 @@ typedef struct
    // GSocketAddress *address;
 
   //  guint timesourceid;
-    char src_uri[100];
+ //   char src_uri[100];
     int keep_alive_flag;
 
     int type;   // TCP/RTP/UDP Jftcp
@@ -115,17 +105,18 @@ typedef struct
 
 typedef struct
 {
-	Sink *sink;  //getting from  sink_hashtable
+	Sink  sink;  //getting from  sink_hashtable
 	Source source;
     GstElement *pipeline;
 	GstBus *bus;
-	char sip_uri[100];  //  = sip_uri
+	char sipuri[100];  //  = sip_uri
+	char callid[100];
 	GMainLoop* loop;
 	GThread * gthread;
-	GMutex sink_hash_mutex;
-	GHashTable *sink_hashtable; //sink type, udp/rtp/tcp  // call_id
+	//GMutex sink_hash_mutex;
+	//GHashTable *sink_hashtable; //sink type, udp/rtp/tcp  // call_id
 
-	Sink *tcpsink;  // Only have 1 tcpsink
+	//Sink *tcpsink;  // Only have 1 tcpsink
 	//char tcpclientsinkcallid[50];
 } GstCustom;
 

@@ -474,7 +474,7 @@ int sipuri_parse(char *buff, int len, char *sipuri)
 			 cnt = i;
 			 flag = 1;
 			 i=i+7;
-	//		 printf("find sipuri \n");
+	 	//	 printf("find sipuri \n");
 		}
 
 		if((flag == 1) && (buff[i]== 0x3b))
