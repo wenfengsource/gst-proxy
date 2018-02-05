@@ -1,259 +1,281 @@
-#include <stdio.h> 
-#include <unistd.h> 
-#include <string.h> 
-#include <gst/gst.h> 
-#include <glib.h> 
+/* GStreamer
+ *
+ * appsink-src.c: example for using appsink and appsrc.
+ *
+ * Copyright (C) 2008 Wim Taymans <wim.taymans@gmail.com>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Library General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Library General Public License for more details.
+ *
+ * You should have received a copy of the GNU Library General Public
+ * License along with this library; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+ * Boston, MA 02110-1301, USA.
+ */
 
+#include <gst/gst.h>
 
-GstElement *pipeline; 
-GstElement *parser[5];
-GstElement *p_queue[5];
+#include <string.h>
 
-static gboolean 
-bus_call (GstBus     *bus, 
-          GstMessage *msg, 
-          gpointer    data) 
-{ 
-  GMainLoop *loop = (GMainLoop *) data; 
+#include <gst/app/gstappsrc.h>
+#include <gst/app/gstappsink.h>
 
-  switch (GST_MESSAGE_TYPE (msg)) { 
+/* these are the caps we are going to pass through the appsink and appsrc */
+const gchar *audio_caps =
+    "audio/x-raw,format=S16LE,channels=1,rate=8000, layout=interleaved";
 
-    case GST_MESSAGE_EOS: 
-      g_print ("End of stream\n"); 
-      g_main_loop_quit (loop); 
-      break; 
-
-    case GST_MESSAGE_ERROR: { 
-      gchar  *debug; 
-      GError *error; 
-
-      gst_message_parse_error (msg, &error, &debug); 
-      g_free (debug); 
-
-      g_printerr ("Error: %s\n", error->message); 
-      g_error_free (error); 
-
-      g_main_loop_quit (loop); 
-      break; 
-    } 
-/*    case GST_MESSAGE_ELEMENT: 
-    { 
-      const GstStructure *str; 
-
-      str = gst_message_get_structure (msg); 
-      const gchar *name = gst_structure_get_name (str); 
-
-      printf("got message from %s\n", name); 
-    } */ 
-    default: 
-      break; 
-  } 
-
-  return TRUE; 
-} 
-
-
-static void link_to_mux (GstPad *tolink_pad,  GstElement *mux)
-{ 
-  GstPad *pad; 
-  gchar *srcname, *sinkname; 
-
-  srcname = gst_pad_get_name (tolink_pad); 
-  pad = gst_element_get_compatible_pad (mux, tolink_pad, NULL); 
-  gst_pad_link (tolink_pad, pad); 
-  sinkname = gst_pad_get_name (pad); 
-  if (GST_PAD_IS_LINKED (pad)) g_print (" pad %s was linked to %s\n",
-srcname, sinkname);
-  else g_print("Link failed: %s to %s!\n",srcname, sinkname);
-  gst_object_unref (GST_OBJECT (pad)); 
-
-  
-  g_free (sinkname); 
-  g_free (srcname); 
-  g_print(" Leaving link to mux\n");
-} 
-
-static void on_pad_added (GstElement *element,
-              GstPad     *pad, 
-              gpointer    data) 
-{ 
-  GstElement *mux = (GstElement *) data; 
-  GstCaps *caps; 
-  gchar *caps_string; 
-  gchar *name; 
-  
-  GstPad *sink_pad, *src_pad;
-
-  name = gst_pad_get_name (pad); 
-  printf("A new pad %s was created\n", name); 
-
-  caps = gst_pad_query_caps (pad, NULL); 
-  caps_string = gst_caps_to_string (caps); 
-  g_print (" Capability:  %s\n", caps_string); 
-
-  if ((strstr(caps_string, "video/mpeg")) && (!parser[0]))
-  {
-    parser[0] = gst_element_factory_make ("mpegvideoparse",  NULL);
-    gst_bin_add (GST_BIN (pipeline), parser[0]);
-    p_queue[0] = gst_element_factory_make ("queue",  NULL);
-    gst_bin_add (GST_BIN (pipeline), p_queue[0]);
-
-    gst_element_set_state (parser[0], GST_STATE_PLAYING);
-    gst_element_set_state (p_queue[0], GST_STATE_PLAYING);
-
-    gst_element_link (p_queue[0], parser[0]);
-
-    sink_pad = gst_element_get_static_pad (p_queue[0], "sink");
-    src_pad = gst_element_get_static_pad (parser[0], "src");
-
-    gst_pad_link (pad, sink_pad);
-    link_to_mux(src_pad, mux);
-    gst_object_unref (GST_OBJECT (sink_pad));
-    gst_object_unref (GST_OBJECT (src_pad));
-  }
-  else if ((strstr(caps_string, "video/x-h264")) && (!parser[0]))
-  {
-    parser[0] = gst_element_factory_make ("h264parse",  NULL);
-    gst_bin_add (GST_BIN (pipeline), parser[0]);
-    p_queue[0] = gst_element_factory_make ("queue",  NULL);
-    gst_bin_add (GST_BIN (pipeline), p_queue[0]);
-
-    gst_element_set_state (parser[0], GST_STATE_PLAYING);
-    gst_element_set_state (p_queue[0], GST_STATE_PLAYING);
-
-    gst_element_link (p_queue[0], parser[0]);
-
-    sink_pad = gst_element_get_static_pad (p_queue[0], "sink");
-    src_pad = gst_element_get_static_pad (parser[0], "src");
-
-    gst_pad_link (pad, sink_pad);
-    link_to_mux(src_pad, mux);
-    gst_object_unref (GST_OBJECT (sink_pad));
-    gst_object_unref (GST_OBJECT (src_pad));
-  }
-  else if ((strstr(caps_string, "audio/mpeg")) && (!parser[1]))
-  { 
-    parser[1] = gst_element_factory_make ("mpegaudioparse",  NULL);
-    gst_bin_add (GST_BIN (pipeline), parser[1]);
-    p_queue[1] = gst_element_factory_make ("queue",  NULL);
-    gst_bin_add (GST_BIN (pipeline), p_queue[1]);
-
-    gst_element_set_state (parser[1], GST_STATE_PLAYING);
-    gst_element_set_state (p_queue[1], GST_STATE_PLAYING);
-
-    gst_element_link (p_queue[1], parser[1]);
-
-    sink_pad = gst_element_get_static_pad (p_queue[1], "sink");
-    src_pad = gst_element_get_static_pad (parser[1], "src");
-
-    gst_pad_link (pad, sink_pad);
-    link_to_mux(src_pad, mux);
-    gst_object_unref (GST_OBJECT (sink_pad));
-    gst_object_unref (GST_OBJECT (src_pad));
-  } 
-  else if ((strstr(caps_string, "audio/x-ac3")) && (!parser[2]))
-  { 
-    parser[2] = gst_element_factory_make ("ac3parse",  NULL);
-    gst_bin_add (GST_BIN (pipeline), parser[2]);
-    p_queue[2] = gst_element_factory_make ("queue",  NULL);
-    gst_bin_add (GST_BIN (pipeline), p_queue[2]);
-
-    gst_element_set_state (parser[2], GST_STATE_PLAYING);
-    gst_element_set_state (p_queue[2], GST_STATE_PLAYING);
-
-    gst_element_link (p_queue[2], parser[2]);
-
-    sink_pad = gst_element_get_static_pad (p_queue[2], "sink");
-    src_pad = gst_element_get_static_pad (parser[2], "src");
-
-    gst_pad_link (pad, sink_pad);
-    link_to_mux(src_pad, mux);
-    gst_object_unref (GST_OBJECT (sink_pad));
-    gst_object_unref (GST_OBJECT (src_pad));
-  } 
-
-
-  gst_caps_unref (caps); 
-  g_free (name); 
-  g_free (caps_string);   
-  g_print("Leaving Pad-Adder\n");
-} 
-
-
-void no_more_pads (GstElement* object, gpointer user_data) 
-{ 
-  g_print("No more pads event from %s\n", gst_element_get_name(object)); 
-} 
-
-void on_pad_removed (GstElement* object, GstPad* pad, gpointer user_data)
+typedef struct
 {
+  GMainLoop *loop;
+  GstElement *source;
+GstElement *sink2;
+  GstElement *sink;
+} ProgramData;
 
-  g_print("pad %s was removed\n", gst_pad_get_name (pad));
+/* called when the appsink notifies us that there is a new buffer ready for
+ * processing */
+static GstFlowReturn
+on_new_sample_from_sink (GstElement * elt, ProgramData * data)
+{
+static int i=0;
+  GstSample *sample;
+  GstBuffer *app_buffer, *buffer, *app_buffer2;
+  GstElement *source;
+ GstElement *source2;
+  GstFlowReturn ret;
+//	printf("emit message \n");
+  /* get the sample from appsink */
+  sample = gst_app_sink_pull_sample (GST_APP_SINK (elt));
+
+  buffer = gst_sample_get_buffer (sample);
+
+  /* make a copy */
+  app_buffer = gst_buffer_copy (buffer);
+ //app_buffer2 = gst_buffer_copy (buffer);
+  /* we don't need the appsink sample anymore */
+  
+
+//  GstMapInfo map;
+//  gst_buffer_map (buffer, &map, GST_MAP_READ);
+//  printf("size = %d \n", map.size);
+// gst_buffer_unmap (buffer, &map);
+  /* get source an push new buffer */
+  source = gst_bin_get_by_name (GST_BIN (data->sink), "testsource");
+  source2 = gst_bin_get_by_name (GST_BIN (data->sink), "multiudpsink");
+  ret = gst_app_src_push_buffer (GST_APP_SRC (source), app_buffer);
+
+if(i==0)
+{
+ i =1;
+ g_signal_emit_by_name (source2, "add", "192.168.128.153", 1024, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.152", 1026, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.154", 1028, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.154", 1030, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.154", 1032, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.154", 1034, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.154", 1036, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.154", 1038, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.154", 1040, NULL);
+g_signal_emit_by_name (source2, "add", "192.168.128.154", 1044, NULL);
+}
+// ret = gst_app_src_push_buffer (GST_APP_SRC (source2), app_buffer2);
+  gst_object_unref (source);
+ gst_object_unref (source2);
+
+gst_sample_unref (sample);
+  return ret;
 }
 
-int 
-main () 
-{ 
-  GMainLoop *loop; 
-
-  GstElement *source, *queue2, *demux, *mux, *queue, *sink;
-  GstBus *bus; 
-
-  gst_init (0, NULL); 
-
-  loop = g_main_loop_new (NULL, FALSE); 
-
-  pipeline = gst_pipeline_new ("DVB-Filesave"); 
-  source   = gst_element_factory_make ("filesrc",  "dvb-source"); 
-  queue2   = gst_element_factory_make ("queue2",      "dvb-queue2");
-  demux    = gst_element_factory_make ("tsdemux",     "dvb-demux"); 
-  mux	  = gst_element_factory_make ("mpegtsmux",   "dvb-mux"); 
-  queue    = gst_element_factory_make ("queue",       "dvb-queue");
-  sink     = gst_element_factory_make ("filesink",    "file-output");
-
-  if (!pipeline || !source || !demux || !mux || !queue || !sink) {
-    g_printerr ("One element could not be created. Exiting.\n"); 
-    if(!pipeline) g_printerr("Pipeline not created\n"); 
-    else if(!source) g_printerr("Source not created\n"); 
-    else if(!demux) g_printerr("Demux not created\n"); 
-    else if(!mux) g_printerr("Muxer not created\n"); 
-    else if(!queue) g_printerr("Queue not created\n");
-    else if(!sink) g_printerr("Sink not created\n"); 
-    return -1; 
-  } 
-
-//  g_object_set (G_OBJECT (source), "adapter", 3, NULL);
-//  g_object_set (G_OBJECT (source), "frequency", 12544000, NULL);
-//  g_object_set (G_OBJECT (source), "program-numbers", "17501", NULL);
-//  g_object_set (G_OBJECT (source), "polarity", "h", NULL);
-//  g_object_set (G_OBJECT (source), "symbol-rate", 22000, NULL);
-
- // g_object_set (G_OBJECT (source), "async-handling", TRUE, NULL);
-  g_object_set (G_OBJECT (source), "location", "./test.ts", NULL);
-  g_object_set (G_OBJECT (sink), "location", "remux_test.mpg", NULL); 
-  g_object_set (G_OBJECT (sink), "sync", FALSE, NULL);
-
-  bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline)); 
-  gst_bus_add_watch (bus, bus_call, loop); 
-  gst_object_unref (bus); 
-
-  gst_bin_add_many (GST_BIN (pipeline), source, queue2, demux, mux, queue,
-sink, NULL);
-
-  gst_element_link_many (source, queue2, demux, NULL);
-  gst_element_link_many (mux, queue, sink, NULL);
-
-  g_signal_connect (demux, "pad-added", G_CALLBACK (on_pad_added), mux); 
-  g_signal_connect (demux, "no-more-pads", G_CALLBACK (no_more_pads), NULL);
-  g_signal_connect (demux, "pad-removed", G_CALLBACK (on_pad_removed),
-NULL);
+/* called when we get a GstMessage from the source pipeline when we get EOS, we
+ * notify the appsrc of it. */
+static gboolean
+on_source_message (GstBus * bus, GstMessage * message, ProgramData * data)
+{
+  GstElement *source;
+  	printf("message = %d --- %s\n",
+			GST_MESSAGE_TYPE (message), GST_MESSAGE_TYPE_NAME(message));
 
 
-  g_print ("Now playing: "); 
-  gst_element_set_state (pipeline, GST_STATE_PLAYING); 
+  switch (GST_MESSAGE_TYPE (message)) {
+    case GST_MESSAGE_EOS:
+      g_print ("The source got dry\n");
+      source = gst_bin_get_by_name (GST_BIN (data->sink), "testsource");
+      gst_app_src_end_of_stream (GST_APP_SRC (source));
+      gst_object_unref (source);
+      break;
+    case GST_MESSAGE_ERROR:
+      g_print ("Received error\n");
+      g_main_loop_quit (data->loop);
+      break;
+    default:
+      break;
+  }
+  return TRUE;
+}
 
-  g_print ("Running...\n"); 
-  g_main_loop_run (loop); 
+/* called when we get a GstMessage from the sink pipeline when we get EOS, we
+ * exit the mainloop and this testapp. */
+static gboolean
+on_sink_message (GstBus * bus, GstMessage * message, ProgramData * data)
+{
+  /* nil */
+  switch (GST_MESSAGE_TYPE (message)) {
+    case GST_MESSAGE_EOS:
+      g_print ("Finished playback\n");
+      g_main_loop_quit (data->loop);
+      break;
+    case GST_MESSAGE_ERROR:
+      g_print ("Received error\n");
+      g_main_loop_quit (data->loop);
+      break;
+    default:
+      break;
+  }
+  return TRUE;
+}
 
-  return 0; 
+
+void cb_udp_client_add (GstElement* object,
+                                        gchararray arg0,
+                                        gint arg1,
+                                        gpointer user_data)
+{
+printf("arg0 = %s \n", arg0);
+printf("arg1 = %d \n", arg1);
+}
+
+
+/* This function is called when the pipeline changes states. We use it to
+ * keep track of the current state. */
+static void state_changed_cb (GstBus *bus, GstMessage *msg, ProgramData *data)
+{
+    GstState old_state, new_state, pending_state;
+    gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
+    if (GST_MESSAGE_SRC (msg) == GST_OBJECT (data->source))
+    {
+       //  data->current_state = new_state;
+        g_print ("State set to %s\n", gst_element_state_get_name (new_state));
+        if (old_state == GST_STATE_READY && new_state == GST_STATE_PAUSED)
+        {
+          /* For extra responsiveness, we refresh the GUI as soon as we reach the PAUSED state */
+
+        }
+    }
+}
+
+
+int
+main (int argc, char *argv[])
+{
+  gchar *filename = NULL;
+  ProgramData *data = NULL;
+  gchar *string = NULL;
+  GstBus *bus = NULL;
+  GstElement *testsink = NULL;
+  GstElement *testsource = NULL;
+ GstElement *testsource2 = NULL;
+  gst_init (&argc, &argv);
+
+  
+
+  data = g_new0 (ProgramData, 1);
+
+  data->loop = g_main_loop_new (NULL, FALSE);
+
+  /* setting up source pipeline, we read from a file and convert to our desired
+   * caps. */
+  string =
+      g_strdup_printf
+      ("gst-launch-1.0 -v udpsrc uri=udp://0.0.0.0:1234 ! appsink name=testsink");
+  //g_free (filename);
+
+  data->source = gst_parse_launch (string, NULL);
+  g_free (string);
+
+  if (data->source == NULL) {
+    g_print ("Bad source\n");
+    return -1;
+  }
+
+  /* to be notified of messages from this pipeline, mostly EOS */
+  bus = gst_element_get_bus (data->source);
+  gst_bus_add_watch (bus, (GstBusFunc) on_source_message, data);
+
+  g_signal_connect (G_OBJECT (bus), "message::state-changed", (GCallback)state_changed_cb, data);
+
+  gst_object_unref (bus);
+
+  /* we use appsink in push mode, it sends us a signal when data is available
+   * and we pull out the data in the signal callback. We want the appsink to
+   * push as fast as it can, hence the sync=false */
+  testsink = gst_bin_get_by_name (GST_BIN (data->source), "testsink");
+  g_object_set (G_OBJECT (testsink), "emit-signals", TRUE, "sync", FALSE, NULL);
+  g_signal_connect (testsink, "new-sample",
+      G_CALLBACK (on_new_sample_from_sink), data);
+  gst_object_unref (testsink);
+
+  /* setting up sink pipeline, we push audio data into this pipeline that will
+   * then play it back using the default audio sink. We have no blocking
+   * behaviour on the src which means that we will push the entire file into
+   * memory. */
+  string =
+      g_strdup_printf ("appsrc name=testsource ! multiudpsink bind-port=1048 name=multiudpsink clients=192.168.128.151:1048");
+  data->sink = gst_parse_launch (string, NULL);
+  g_free (string);
+
+  if (data->sink == NULL) {
+    g_print ("Bad sink\n");
+    return -1;
+  }
+
+
+
+  testsource = gst_bin_get_by_name (GST_BIN (data->sink), "testsource");
+  /* configure for time-based format */
+  g_object_set (testsource, "format", GST_FORMAT_TIME, NULL);
+  /* uncomment the next line to block when appsrc has buffered enough */
+  /* g_object_set (testsource, "block", TRUE, NULL); */
+  gst_object_unref (testsource);
+
+
+  testsource = gst_bin_get_by_name (GST_BIN (data->sink), "multiudpsink");
+   
+  g_signal_connect (testsource, "client-added",
+      G_CALLBACK (cb_udp_client_add), data);
+
+  gst_object_unref (testsource);
+
+
+ 
+  bus = gst_element_get_bus (data->sink);
+  gst_bus_add_watch (bus, (GstBusFunc) on_sink_message, data);
+  gst_object_unref (bus);
+
+  /* launching things */
+  gst_element_set_state (data->sink, GST_STATE_PLAYING);
+  gst_element_set_state (data->sink2, GST_STATE_PLAYING);
+  gst_element_set_state (data->source, GST_STATE_PLAYING);
+
+  /* let's run !, this loop will quit when the sink pipeline goes EOS or when an
+   * error occurs in the source or sink pipelines. */
+  g_print ("Let's run!\n");
+  g_main_loop_run (data->loop);
+  g_print ("Going out\n");
+
+  gst_element_set_state (data->source, GST_STATE_NULL);
+  gst_element_set_state (data->sink, GST_STATE_NULL);
+
+  gst_object_unref (data->source);
+  gst_object_unref (data->sink);
+  g_main_loop_unref (data->loop);
+  g_free (data);
+
+  return 0;
 }
