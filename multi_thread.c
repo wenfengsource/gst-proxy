@@ -407,6 +407,13 @@ void cb_tcp_client_add  (GstElement* object, GSocket *arg0, gpointer user_data)
 	{
 		 //g_signal_emit_by_name(object,"remove", arg0);
 		printf("tcp client is not we assigned client \n");
+
+		g_mutex_lock (&snd_data_mutex);
+		bzero(tx_buf,sizeof(tx_buf));
+		sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;",gst->callid, gst->sipuri);
+		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
+		g_mutex_unlock (&snd_data_mutex);
+
 	}
 
 	g_free (ip);
@@ -429,7 +436,7 @@ void cb_tcp_client_remove(GstElement* object,GSocket* arg0, gpointer arg1, gpoin
 			    gchar *ip =
 			        g_inet_address_to_string (g_inet_socket_address_get_address (addr));
 			    port = g_inet_socket_address_get_port (addr);
-		    printf ( "remove client=== ip %s:%u with socket %p \n",
+		    printf ( "tcp server remove client=== ip %s:%u with socket %p \n",
 			         ip, port, user_data);
 
 			    g_object_unref (addr);
@@ -724,11 +731,12 @@ exit:
 
 		 g_signal_connect (gstcustom->source.src, "pad-added", (GCallback)pad_added_handler_for_rtsp, gstcustom);
 
-		 char tmp[100];
-		 memset(tmp,0,100);
-		 sprintf(tmp,"rtsp://%s:554/Streaming/Channels/101",gstcustom->source.src_ip);
+		// char tmp[100];
+		// memset(tmp,0,100);
+		// sprintf(tmp,"rtsp://%s:554/Streaming/Channels/101",gstcustom->source.src_ip);
 		// printf("==========%s======%s \n", gstcustom->source.src_ip, tmp);
-		 g_object_set (gstcustom->source.src, "location",tmp, NULL);
+		 printf("rtsp = %s \n", gstcustom->source.rtspaddr);
+		 g_object_set (gstcustom->source.src, "location",gstcustom->source.rtspaddr, NULL);
 		 g_object_set (gstcustom->source.h264parse, "config-interval",1, NULL);
 		 g_object_set (gstcustom->source.mpegtsmux, "alignment",7, NULL);
 
@@ -897,7 +905,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 				sink_dst_port= 0, sink_src_port = 0,source_src_port =0, source_dst_port=0, NAT_Flag = 0;
 
 		char sipuri[100], sink_dst_uri[30], sink_dst_ip[20], sink_src_ip[20], source_src_ip[20],source_dst_ip[20];
-		char gst_hashtable_key[100],  callid[100];
+		char gst_hashtable_key[100],  callid[100], rtspaddr[100];
 
 
 		//printf("receive data \n");
@@ -1267,7 +1275,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 //			printf("not find source_dst_ip \n");
 //
 //		}
-
+        bzero(rtspaddr,100);
+		rtspaddr_parse(rx_buf, rcv_size,rtspaddr);
 
        // sleep(1);
 		if(invite_flag == TRUE)
@@ -1318,6 +1327,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 						 gst_ptr->sink.dst_port = sink_dst_port;
 						 gst_ptr->sink.type = sink_type;
 						 gst_ptr->source.type = src_type;
+						 bzero(gst_ptr->source.rtspaddr,100);
+						 g_stpcpy(gst_ptr->source.rtspaddr, rtspaddr);
 
 						 gst_ptr->source.keep_alive_str_lenth = keep_alive_string_len_parse(rx_buf, rcv_size);
 						 memset(gst_ptr->source.keep_alive_str, 0 ,100);
@@ -1411,6 +1422,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 		}
 }
 
+// release send port and keep alive socket
  void free_all_keepalive_for_sink( gpointer user_data)
  {
 
@@ -1782,7 +1794,7 @@ int  main (int argc, char **argv)
 
     printf("Mdeia_Distribute Version=%s",VERSION);
 
-	fp = fopen("./mediaproxy.cfg", "rb");
+	fp = fopen("./md.cfg", "rb");
 
 	if(fp == NULL)
 	{

@@ -495,6 +495,42 @@ int sipuri_parse(char *buff, int len, char *sipuri)
 
 }
 
+int rtspaddr_parse(char *buff, int len, char *rtspaddr)
+{
+	int i=0, j=0 ;
+	int cnt;
+	//char type[3];
+	int flag =0;
+
+	//memset(type,0,3);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "rtspaddr=", 9) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+9;
+	 	//	 printf("find sipuri \n");
+		}
+
+		if((flag == 1) && (buff[i]== 0x3b))
+		{
+		//	printf(" buff[i] = %02x\n",  buff[i]);
+			  return 1;
+			// break;
+		}
+
+		if(flag == 1)
+		{
+			rtspaddr[j++] = buff[i];
+
+		}
+
+	}
+	return  0;
+
+}
+
 int jftcpstring_parse(char *buff, int len, char *jftcp)
 {
 	int i=0, j=0 ;

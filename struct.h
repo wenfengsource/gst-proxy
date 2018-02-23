@@ -88,6 +88,7 @@ typedef struct
 
     char dst_ip[20];
     char src_ip[20];
+    char rtspaddr[100];
     int dst_port;
     int src_port;
   //  GSocket *sndkeepalive_socket;
