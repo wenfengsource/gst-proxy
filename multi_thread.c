@@ -92,7 +92,7 @@ static GSocket *backup_sock;
 static GstElement *backup_element;
 static GSocket *g_socket;
 int fd;
-
+extern int exit_flag;
 void *new_pipeline_thread( gpointer *arg);
 //void add_source(GMainContext *context);
 void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data);
@@ -897,8 +897,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 	 fflush(stdout);
 
 	rcv_size = len;
-	//gRcvSocket = rcv_socket_init();
-	//while(1)
+	gRcvSocket = rcv_socket_init();
+	while(1)
 	{
 
 		int src_type = 0, sink_type = 0, invite_flag =0, bye_flag = 0, 	sink_keep_alive_flag=0, source_keep_alive_flag =0,
@@ -908,18 +908,18 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 		char gst_hashtable_key[100],  callid[100], rtspaddr[100];
 
 
-		//printf("receive data \n");
-		//memset(rx_buf, 0 ,1500);
+		printf("waitting cmd .... \n");
+		memset(rx_buf, 0 ,1500);
 
-		//rcv_size = receive_packet(rx_buf);
+		rcv_size = receive_packet(rx_buf);
 
 		if(remote_ip_parse(rx_buf,rcv_size, remote_ip))
 		{
 		 	//tcp_client_remove();
 			printf("remote ip = %s \n",remote_ip);
 		    g_stpcpy(g_remote_ip, remote_ip);
-		    return 0;
-			//continue;
+		    //return 0;
+			continue;
 		}
 
 		g_mutex_lock (&gst_mutex);
@@ -942,16 +942,16 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 		if(callid_parse(rx_buf,rcv_size,callid) == 0)
 		{
 			printf("not find callid \n");
-			return 0;
-			//continue;
+			//return 0;
+			 continue;
 		}
 
 		memset(sipuri, 0 ,100);
 		if(sipuri_parse(rx_buf,rcv_size,sipuri) == 0)
 		{
 			printf("not find sipuri \n");
-			return 0;
-			//continue;
+			//return 0;
+			 continue;
 		}
 
 
@@ -1157,7 +1157,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 				g_mutex_lock (&sink_snd_port_mutex);
 				ptr = g_hash_table_lookup(Hashtbl_Tcp_sink_snd_port ,callid);
 				g_mutex_unlock (&sink_snd_port_mutex);
-				while(1)
+				while(exit_flag != TRUE)
 				{
 					if(ptr == NULL)
 					{
@@ -1217,8 +1217,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 		    send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT_ACK);
 		    g_mutex_unlock (&snd_data_mutex);
 		 //   printf("tx_buf -----%s \n", tx_buf);
-		    return 0;
-			//continue;
+		  //   return 0;
+			 continue;
 		}
 
 		//string  parse
@@ -1236,8 +1236,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
         if(source_dst_port ==0 && invite_flag == 1 && src_type == UDP)
         {
         	printf("not find source_dst_port \n");
-        	return 0;
-        	//continue;
+        	//return 0;
+        	 continue;
         }
 
 		sink_keep_alive_flag = sink_keep_alive_parse(rx_buf, rcv_size);
@@ -1254,8 +1254,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 		if((invite_flag ==1) && (sink_dst_ip_parse(rx_buf, rcv_size,sink_dst_ip) == 0))
 		{
 			printf("not find sink_dst_ip \n");
-			return 0;
-			//continue;
+			//return 0;
+			 continue;
 		}
 
 //		if((invite_flag ==1) && (sink_src_ip_parse(rx_buf, rcv_size,sink_src_ip) == 0))
@@ -1266,7 +1266,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 		int tmp = source_src_ip_parse(rx_buf, rcv_size,source_src_ip) ;
 		if(((source_keep_alive_flag == 1) || src_type == TCPCLIENT) && (tmp == 0))
 		{
-			printf("not find source src ip \n");
+		//	printf("not find source src ip \n");
 		//	return 0;
 			//continue;
 		}
@@ -1420,6 +1420,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 
 		}
+		printf("exit cmd loop \n");
 }
 
 // release send port and keep alive socket
@@ -1750,7 +1751,7 @@ void remove_source()
 void Stop(int signo)
 {
     printf("oops! stop!!!\n");
-   // exit_flag = True;
+    exit_flag = TRUE;
 
 	//close(gRcvSocket);
     g_main_loop_quit (loop);
@@ -1839,7 +1840,7 @@ int  main (int argc, char **argv)
 
 	gSndSocket = snd_socket_init();
 
-	pthread_t gst_rcv_tid;
+//	pthread_t gst_rcv_tid;
 
 	//int err;
 	gst_init (&argc, &argv);
@@ -1857,15 +1858,16 @@ int  main (int argc, char **argv)
 
 
  	loop = g_main_loop_new (NULL, FALSE);
-    add_source(NULL);
+   // add_source(NULL);
 
+ 	 GThread *cmdthread =  g_thread_new("cmd_thread",cmd_thread,NULL);
 
     g_timeout_add_seconds(30,time_ticket ,NULL);
 
 	 g_main_loop_run (loop);
 
 	g_main_loop_unref (loop);
- 	remove_source();
+ 	//remove_source();
  	g_socket_close (g_socket,NULL);
 
 	return 0;

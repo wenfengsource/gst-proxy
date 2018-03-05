@@ -20,7 +20,7 @@
 //extern void DTV_Close();
 #define RCVBUFSIZE     1500
 #define SNDBUFSIZE     1500
-#define RCV_PORT       50000
+#define RCV_PORT       50001
 #define SND_PORT       50002
 
 int gRcvSocket;
@@ -104,12 +104,12 @@ int receive_packet(unsigned char *rx_buf)
 	printf("rec_size = %d rec_buf %s\n", rec_size,rx_buf);
 	//}
 
-	printf("rx_buf data:");
+	//printf("rx_buf data:");
 //	for(i=0;i<rec_size;i++)
 //	{
 //	printf("%02x ",rx_buf[i]);
 //	}
-	printf("\n");
+	//printf("\n");
 	return rec_size;
 
 }
