@@ -104,7 +104,7 @@ int receive_packet(unsigned char *rx_buf)
 	printf("rec_size = %d rec_buf %s\n", rec_size,rx_buf);
 	//}
 
-	printf("rx_buf data:");
+	//printf("rx_buf data:");
 //	for(i=0;i<rec_size;i++)
 //	{
 //	printf("%02x ",rx_buf[i]);
