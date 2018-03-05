@@ -49,9 +49,9 @@ typedef struct
   int src_port;
   char src_ip[20];
 
- // char callid[100];
+  char callid[100];
 
-  //char sipuri[100];
+  char sipuri[100];
 
   int src_fd;  // socket used for receive keep_alive data
   int keep_alive_flag;
@@ -106,7 +106,7 @@ typedef struct
 
 typedef struct
 {
-	Sink  sink;  //getting from  sink_hashtable
+	Sink  *sink;  //getting from  sink_hashtable
 	Source source;
     GstElement *pipeline;
 	GstBus *bus;
@@ -114,8 +114,8 @@ typedef struct
 	char callid[100];
 	GMainLoop* loop;
 	GThread * gthread;
-	//GMutex sink_hash_mutex;
-	//GHashTable *sink_hashtable; //sink type, udp/rtp/tcp  // call_id
+	 GMutex sink_hash_mutex;
+	 GHashTable *sink_hashtable; //sink type, udp/rtp/tcp  // call_id
 
 	//Sink *tcpsink;  // Only have 1 tcpsink
 	//char tcpclientsinkcallid[50];

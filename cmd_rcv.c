@@ -20,7 +20,7 @@
 //extern void DTV_Close();
 #define RCVBUFSIZE     1500
 #define SNDBUFSIZE     1500
-#define RCV_PORT       50000
+#define RCV_PORT       50001
 #define SND_PORT       50002
 
 int gRcvSocket;
