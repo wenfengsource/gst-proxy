@@ -92,7 +92,7 @@ static GSocket *backup_sock;
 static GstElement *backup_element;
 static GSocket *g_socket;
 int fd;
-
+extern int exit_flag;
 void *new_pipeline_thread( gpointer *arg);
 //void add_source(GMainContext *context);
 void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data);
@@ -961,7 +961,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 	rcv_size = len;
 	gRcvSocket = rcv_socket_init();
-	while(1)
+	while(exit_flag != TRUE)
 	{
 
 		int src_type = 0, sink_type = 0, invite_flag =0, bye_flag = 0, 	sink_keep_alive_flag=0, source_keep_alive_flag =0,
@@ -971,7 +971,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 		char gst_hashtable_key[100],  callid[100], rtspaddr[100];
 
 
-		 printf("receive data \n");
+		 printf("waitting data.... \n");
 		 memset(rx_buf, 0 ,1500);
 
 		 rcv_size = receive_packet(rx_buf);
@@ -1718,6 +1718,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 		}
 	}
+	printf("exit cmd loop \n");
 }
 
 // release send port and keep alive socket
@@ -2298,10 +2299,10 @@ void remove_source()
 void Stop(int signo)
 {
     printf("oops! stop!!!\n");
-   // exit_flag = True;
+    exit_flag = TRUE;
 
 	//close(gRcvSocket);
-   // g_main_loop_quit (loop);
+    g_main_loop_quit (loop);
 	close(gSndSocket);
 	//close(gSndSocket);
 
