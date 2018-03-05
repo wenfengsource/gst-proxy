@@ -574,7 +574,7 @@ exit:
 			// Disabling this might result in minor performance improvements
 			g_object_set (gstcustom->source.src, "retrieve-sender-address", FALSE,NULL);
 
-			g_object_set (gstcustom->source.src, "keep-alive-time",28,NULL); // for test
+			g_object_set (gstcustom->source.src, "keep-alive-time",5,NULL); // for test
 			if(gstcustom->source.keep_alive_str_lenth == 0)
 			{
 				g_object_set (gstcustom->source.src, "keep-alive-len", 10, NULL);
