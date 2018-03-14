@@ -1436,7 +1436,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 					printf(" waitting thread exit \n");
 					g_thread_join(tmp->gthread);
-
+					gst_bus_remove_signal_watch(tmp->bus);
 
 					g_mutex_lock (&gst_mutex);
 					if(g_hash_table_remove(gsthashtbale,tmp->callid))
