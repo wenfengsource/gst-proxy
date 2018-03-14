@@ -1011,6 +1011,14 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 						   {
 							   Cur_Rcv_Udp_Port = RCV_PORT_MIN;
 						   }
+
+						   int cnt =0;
+						   cnt = g_hash_table_size(Hashtbl_Udp_Source_rcv_port);
+						   if(cnt >= (RCV_PORT_MAX - RCV_PORT_MIN)/PORT_STEP)
+						   {
+							   printf("not find available udp rcv port = %d\n", cnt);
+							   break;
+						   }
 					   }
 
 
@@ -1074,6 +1082,15 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 								   Cur_Rcv_Tcp_Port = RCV_PORT_MIN;
 							   }
 
+							   int cnt=0;
+							   cnt = g_hash_table_size(Hashtbl_Tcp_Source_rcv_port);
+
+							   if(cnt >= (RCV_PORT_MAX - RCV_PORT_MIN)/PORT_STEP)
+							   {
+								   printf("not find available tcp rcv port = %d\n", cnt);
+								   break;
+							   }
+
 						   }
 
 					}
@@ -1134,6 +1151,15 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							   Cur_Snd_Udp_Port = SND_PORT_MIN;
 							}
 
+							int cnt=0;
+						   cnt = g_hash_table_size(Hashtbl_udp_sink_snd_port);
+
+						   if(cnt >= (SND_PORT_MAX - SND_PORT_MIN)/PORT_STEP)
+						   {
+							   printf("not find available udp snd port = %d\n", cnt);
+							   break;
+						   }
+
 					   }
 
 
@@ -1189,6 +1215,15 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							{
 								Cur_Snd_Tcp_Port = SND_PORT_MIN;
 							}
+
+							int cnt=0;
+						   cnt = g_hash_table_size(Hashtbl_Tcp_sink_snd_port);
+
+						   if(cnt >= (SND_PORT_MAX - SND_PORT_MIN)/PORT_STEP)
+						   {
+							   printf("not find available udp snd port = %d\n", cnt);
+							   break;
+						   }
 						}
 					}
 					else
