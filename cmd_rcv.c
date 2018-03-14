@@ -60,6 +60,8 @@ void send_packet(unsigned char *tx_buf ,int length, char *ip, int port)//SNDBUFS
 
 	sendto(gSndSocket, tx_buf, length, 0, (struct sockaddr*)&gSndAddr, sizeof(struct sockaddr_in));
 
+	//printf("snd data = %s\n",tx_buf);
+
 
 }
 

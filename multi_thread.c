@@ -27,7 +27,7 @@
 #define TCPCLIENT 3
 #define TCPSERVER 5
 
-#define DEBUG        1
+//#define DEBUG        0
 
 static int rcv_port_min;
 static int rcv_port_max;
@@ -561,6 +561,10 @@ static void pad_added_handler_for_rtsp (GstElement *src, GstPad *new_pad, gpoint
     	g_print (" audio pad\n");
     	sink_pad = gst_element_get_static_pad (ptr->source.audiodepay,"sink");
         //goto exit;
+
+    	g_mutex_lock(&ptr->pipeline_mutex);
+    	ptr->pipeline_flag = 1;
+    	g_mutex_unlock(&ptr->pipeline_mutex);
     }
 
   /* Attempt the link */
@@ -622,7 +626,8 @@ exit:
 		//loop = g_main_loop_new (NULL, FALSE);
 
 
-		g_object_set (gstcustom->source.src, "timeout",40000000000);   // 30s
+		g_object_set (gstcustom->source.src, "timeout",30000000000);   // 30s
+
 	 	g_object_set (gstcustom->source.src, "buffer-size",212992);   // 208KB  Set to Max value
 
 		printf("gstcustom->sipuri = %s \n",gstcustom->sipuri);
@@ -637,7 +642,7 @@ exit:
 			// Disabling this might result in minor performance improvements
 			g_object_set (gstcustom->source.src, "retrieve-sender-address", FALSE,NULL);
 
-			g_object_set (gstcustom->source.src, "keep-alive-time",28,NULL); // for test
+			g_object_set (gstcustom->source.src, "keep-alive-time",5,NULL); // for test
 			if(gstcustom->source.keep_alive_str_lenth == 0)
 			{
 				g_object_set (gstcustom->source.src, "keep-alive-len", 10, NULL);
@@ -1013,8 +1018,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 		if(sipuri_parse(rx_buf,rcv_size,sipuri) == 0)
 		{
 			printf("not find sipuri \n");
-			return 0;
-			//continue;
+			//return 0;
+			continue;
 		}
 
 
@@ -1073,6 +1078,15 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 						   if(Cur_Rcv_Udp_Port >= RCV_PORT_MAX)
 						   {
 							   Cur_Rcv_Udp_Port = RCV_PORT_MIN;
+						   }
+
+						   int cnt=0;
+						   cnt = g_hash_table_size(Hashtbl_Udp_Source_rcv_port);
+
+						   if(cnt >= (RCV_PORT_MAX - RCV_PORT_MIN)/PORT_STEP)
+						   {
+							   printf("not find available udp rcv port = %d\n", cnt);
+							   break;
 						   }
 					   }
 
@@ -1137,6 +1151,16 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 								   Cur_Rcv_Tcp_Port = RCV_PORT_MIN;
 							   }
 
+							   int cnt=0;
+							   cnt = g_hash_table_size(Hashtbl_Tcp_Source_rcv_port);
+
+							   if(cnt >= (RCV_PORT_MAX - RCV_PORT_MIN)/PORT_STEP)
+							   {
+								   printf("not find available tcp rcv port = %d\n", cnt);
+								   break;
+							   }
+
+
 						   }
 
 					}
@@ -1197,6 +1221,15 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							   Cur_Snd_Udp_Port = SND_PORT_MIN;
 							}
 
+							int cnt=0;
+						   cnt = g_hash_table_size(Hashtbl_udp_sink_snd_port);
+
+						   if(cnt >= (SND_PORT_MAX - SND_PORT_MIN)/PORT_STEP)
+						   {
+							   printf("not find available udp snd port = %d\n", cnt);
+							   break;
+						   }
+
 					   }
 
 
@@ -1252,6 +1285,17 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							{
 								Cur_Snd_Tcp_Port = SND_PORT_MIN;
 							}
+
+
+						   int cnt=0;
+						   cnt = g_hash_table_size(Hashtbl_Tcp_sink_snd_port);
+
+						   if(cnt >= (SND_PORT_MAX - SND_PORT_MIN)/PORT_STEP)
+						   {
+							   printf("not find available udp rcv port = %d\n", cnt);
+							   break;
+						   }
+
 						}
 					}
 					else
@@ -1374,9 +1418,12 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 						 printf("create pipeline \n");
 						 GstCustom *gst_ptr = g_new0(GstCustom, 1);
 
+						 g_mutex_init(&gst_ptr->pipeline_mutex);
+
+						 g_mutex_init(&(gst_ptr->sink_hash_mutex));
 
 						 gst_ptr->sink = g_new0(Sink, 1);
-						 printf("sink address %p ",gst_ptr->sink );
+						 printf("create new sink address =%p ,callid =%s\n", gst_ptr->sink, callid);
 						 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_sink_key,  free_sink_value );
 
 						 g_hash_table_insert (gst_ptr->sink_hashtable, g_strdup(callid), gst_ptr->sink);
@@ -1459,6 +1506,22 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 						Sink *sink;
 
+						// ensure pipeline is created
+						int cnt =100;
+						while(cnt--)
+						{
+							g_mutex_lock(&tmp->pipeline_mutex);
+							if(tmp->pipeline_flag ==1)
+							{
+								g_mutex_unlock(&tmp->pipeline_mutex);
+								break;
+
+							}
+							g_mutex_unlock(&tmp->pipeline_mutex);
+							printf("|||||||||||||||||||| \n");
+							usleep(5000);
+						}
+
 						g_mutex_lock (&tmp->sink_hash_mutex);
 						sink = g_hash_table_lookup (tmp->sink_hashtable, callid);
 						g_mutex_unlock (&tmp->sink_hash_mutex);
@@ -1468,9 +1531,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							printf("error the same callid and the same sipuri \n");
 							break;
 						}
-						printf("create new sink \n");
-
 						 sink  = g_new0(Sink, 1);
+						 printf("create new sink address =%p ,callid =%s\n", sink, callid);
 						 tmp->sink = sink;
 						 g_stpcpy(sink->callid, callid);
 						 g_stpcpy(sink->sipuri, sipuri);
@@ -1501,7 +1563,11 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							memset(sink->jftcpstring,0,301);
 							jftcpstring_parse(rx_buf, rcv_size, sink->jftcpstring);
 						}
+
+					 	g_mutex_lock(&tmp->pipeline_mutex);
 						Linksink_to_pipeline(tmp, sink);
+					 	g_mutex_unlock(&tmp->pipeline_mutex);
+
 					}
 
 				}
@@ -1512,8 +1578,13 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 					   // check udp type src pipeline if is created
 						 printf("create pipeline \n");
 						 GstCustom *gst_ptr = g_new0(GstCustom, 1);
+						 g_mutex_init(&(gst_ptr->sink_hash_mutex));
+						 g_mutex_init(&(gst_ptr->pipeline_mutex));
+						 gst_ptr->pipeline_flag = 0;
 						 Sink *sink;
 						 sink  = g_new0(Sink, 1);
+						 printf("create new sink address =%p ,callid =%s\n", sink, callid);
+
 						 gst_ptr->sink = sink;
 						 gst_ptr->sink_hashtable = g_hash_table_new_full (g_str_hash , g_str_equal,free_sink_key,  free_sink_value );
 
@@ -1650,7 +1721,8 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							{
 								g_mutex_unlock (&tmp->sink_hash_mutex);
 
-
+								printf("sink address %p callid %s \n",sink,sink->callid);
+								//printf("sink tee pad address =%p ,callid =%s\n", sink->teepad, callid);
 								 gst_pad_add_probe (sink->teepad, GST_PAD_PROBE_TYPE_IDLE, unlink_cb, tmp,NULL);
 
 								 g_mutex_lock (&snd_data_mutex);
@@ -1659,13 +1731,6 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 								 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 								 g_mutex_unlock (&snd_data_mutex);
 
-
-								 g_mutex_lock (&tmp->sink_hash_mutex);
-								if(g_hash_table_remove(tmp->sink_hashtable, callid))
-								{
-									printf("remove sub sink successful \n");
-								}
-								g_mutex_unlock (&tmp->sink_hash_mutex);
 							}
 
 							else if((g_hash_table_size(tmp->sink_hashtable) == 1))
@@ -1759,7 +1824,7 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
 	 printf("tx_buf %s \n", tx_buf);
 	 g_mutex_unlock (&snd_data_mutex);
 	// sleep(1);
-	 printf("tx_buf  === \n"   );
+	// printf("tx_buf  === \n"   );
 
  }
 
@@ -1784,6 +1849,7 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  unlink_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
  {
 
+
  	g_print ("removed unlink tee \n");
 
  	GstCustom *gstptr = (GstCustom*)user_data;
@@ -1791,6 +1857,8 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  	GstElement *tee = gstptr->source.tee;
 
  	GstPad *sinkpad;
+
+  	g_mutex_lock(&gstptr->pipeline_mutex);
 
  	//  if (!g_atomic_int_compare_and_exchange (&sink->removing, FALSE, TRUE))
  	//    return GST_PAD_PROBE_OK;
@@ -1859,6 +1927,15 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
 
  	}
 
+//	 g_mutex_lock (&tmp->sink_hash_mutex);
+//	if(g_hash_table_remove(tmp->sink_hashtable, callid))
+//	{
+//		printf("remove sub sink successful \n");
+//	}
+//	g_mutex_unlock (&tmp->sink_hash_mutex);
+
+ 	g_mutex_unlock(&gstptr->pipeline_mutex);
+
  	return GST_PAD_PROBE_REMOVE;
  }
 
@@ -1867,6 +1944,8 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  {
  	 GstPad *sinkpad;
  	 GstPadTemplate *templ;
+
+ 	printf("Linksink_to_pipeline sipuri\n",gstcustom->sipuri);
 
  	 templ =
  	        gst_element_class_get_pad_template (GST_ELEMENT_GET_CLASS (gstcustom->source.tee),
@@ -1999,7 +2078,9 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
 	gstdata->loop =  g_main_loop_new (NULL, FALSE);
 	printf("create new thread for new pipeline\n");
 
+	g_mutex_lock(&gstdata->pipeline_mutex);
 	Create_source_sink_pipeline(gstdata);
+	g_mutex_unlock(&gstdata->pipeline_mutex);
 
 	g_main_loop_run (gstdata->loop);
 
@@ -2027,6 +2108,8 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
 		gstdata->sink_hashtable = NULL;
 		g_mutex_clear (&gstdata->sink_hash_mutex);
 	}
+
+    g_mutex_clear (&gstdata->pipeline_mutex);
 
 	 g_mutex_lock (&source_rcv_port_mutex);
 	 if(gstdata->source.type == UDP || gstdata->source.type == RTP)
