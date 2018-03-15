@@ -116,9 +116,9 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
       name = gst_object_get_path_string (message->src);
      // gst_message_parse_warning (message, &err, &debug);
 
-      g_printerr ("message: from element %s: type = %d\n", name, GST_MESSAGE_TYPE (message));
+      printf ("message: from element %s: type = %d\n", name, GST_MESSAGE_TYPE (message));
    //   if (debug != NULL)
-    //    g_printerr ("Additional debug info:\n%s\n", debug);
+    //    printf ("Additional debug info:\n%s\n", debug);
 
    //   g_error_free (err);
     //  g_free (debug);
@@ -139,9 +139,9 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		name = gst_object_get_path_string (message->src);
 		// gst_message_parse_warning (message, &err, &debug);
 
- 	 //  g_printerr ("message: from element %s\n", name);
+ 	 //  printf ("message: from element %s\n", name);
 		//   if (debug != NULL)
-		//    g_printerr ("Additional debug info:\n%s\n", debug);
+		//    printf ("Additional debug info:\n%s\n", debug);
 
 		//   g_error_free (err);
 		//  g_free (debug);
@@ -183,9 +183,9 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 	  name = gst_object_get_path_string (message->src);
 	  gst_message_parse_error (message, &err, &debug);
 	
-	  g_printerr ("ERROR: from element %s ---: %s\n", ele_name, err->message);
+	  printf ("ERROR: from element %s ---: %s\n", ele_name, err->message);
 	  if (debug != NULL)
-		g_printerr ("Additional debug info:\n%s\n", debug);
+		  printf ("Additional debug info:\n%s\n", debug);
 
 	  pt = strstr(ele_name,"tcpclientsink:"); // get callid for pt
       pt1 = strstr(ele_name,"multiudpsink:"); // get callid for pt
@@ -213,8 +213,6 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 				g_free (ele_name);
 				break;
 			}
-
-			printf("GstTCPClientSink error message \n");
 
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
@@ -245,7 +243,7 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 			break;
 		}
 
-		 printf("%s error message \n", pt1);
+	//	 printf("%s error message \n", pt1);
 
 		g_mutex_lock (&snd_data_mutex);
 		bzero(tx_buf,sizeof(tx_buf));
@@ -323,9 +321,9 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
       name = gst_object_get_path_string (message->src);
       gst_message_parse_warning (message, &err, &debug);
 
-      g_printerr ("WARNING: from element %s: %s\n", name, err->message);
+      printf ("WARNING: from element %s: %s\n", name, err->message);
       if (debug != NULL)
-        g_printerr ("Additional debug info:\n%s\n", debug);
+        printf ("Additional debug info:\n%s\n", debug);
 
       g_error_free (err);
       g_free (debug);
@@ -634,29 +632,29 @@ exit:
 
 		// need keep alive
 		//if(gstcustom->source.sndkeepalive_socket == NULL)
-		{
-			printf("using udpsrc default socket \n");
+		//{
+		//	printf("using udpsrc default socket \n");
 			//  g_object_set (gstcustom->source.src, "uri",gstcustom->source.src_uri, NULL);
-			g_object_set (gstcustom->source.src, "port", gstcustom->source.dst_port,NULL);
-			g_object_set (gstcustom->source.src, "address", "0.0.0.0",NULL);
-			// Disabling this might result in minor performance improvements
-			g_object_set (gstcustom->source.src, "retrieve-sender-address", FALSE,NULL);
+		g_object_set (gstcustom->source.src, "port", gstcustom->source.dst_port,NULL);
+		g_object_set (gstcustom->source.src, "address", "0.0.0.0",NULL);
+		// Disabling this might result in minor performance improvements
+		g_object_set (gstcustom->source.src, "retrieve-sender-address", FALSE,NULL);
 
-			g_object_set (gstcustom->source.src, "keep-alive-time",5,NULL); // for test
-			if(gstcustom->source.keep_alive_str_lenth == 0)
-			{
-				g_object_set (gstcustom->source.src, "keep-alive-len", 10, NULL);
-				g_object_set (gstcustom->source.src, "keep-alive-string","hello_word",NULL);
-			}
-			else
-			{
-				g_object_set (gstcustom->source.src, "keep-alive-len", gstcustom->source.keep_alive_str_lenth,NULL);
-				g_object_set (gstcustom->source.src, "keep-alive-string", gstcustom->source.keep_alive_str,NULL);
-			}
-			g_object_set (gstcustom->source.src, "nat_flag",0,NULL);  // need add nat transfer ?
-
-
+		g_object_set (gstcustom->source.src, "keep-alive-time",5,NULL); // for test
+		if(gstcustom->source.keep_alive_str_lenth == 0)
+		{
+			g_object_set (gstcustom->source.src, "keep-alive-len", 10, NULL);
+			g_object_set (gstcustom->source.src, "keep-alive-string","hello_word",NULL);
 		}
+		else
+		{
+			g_object_set (gstcustom->source.src, "keep-alive-len", gstcustom->source.keep_alive_str_lenth,NULL);
+			g_object_set (gstcustom->source.src, "keep-alive-string", gstcustom->source.keep_alive_str,NULL);
+		}
+		g_object_set (gstcustom->source.src, "nat_flag",0,NULL);  // need add nat transfer ?
+
+
+		//}
 
 
 	}
@@ -915,7 +913,7 @@ exit:
 
 	    if (gst_pad_link (gstcustom->sink->teepad, sinkpad) != GST_PAD_LINK_OK)
 		{
-			g_printerr ("Tee could not be linked.\n");
+			printf ("Tee could not be linked.\n");
 			// need add error process
 		}
 
@@ -1083,7 +1081,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 						   int cnt=0;
 						   cnt = g_hash_table_size(Hashtbl_Udp_Source_rcv_port);
 
-						   if(cnt >= (RCV_PORT_MAX - RCV_PORT_MIN)/PORT_STEP)
+						   if(cnt >= (RCV_PORT_MAX - RCV_PORT_MIN)/PORT_STEP -1)
 						   {
 							   printf("not find available udp rcv port = %d\n", cnt);
 							   break;
@@ -1154,7 +1152,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							   int cnt=0;
 							   cnt = g_hash_table_size(Hashtbl_Tcp_Source_rcv_port);
 
-							   if(cnt >= (RCV_PORT_MAX - RCV_PORT_MIN)/PORT_STEP)
+							   if(cnt >= (RCV_PORT_MAX - RCV_PORT_MIN)/PORT_STEP -1)
 							   {
 								   printf("not find available tcp rcv port = %d\n", cnt);
 								   break;
@@ -1224,7 +1222,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							int cnt=0;
 						   cnt = g_hash_table_size(Hashtbl_udp_sink_snd_port);
 
-						   if(cnt >= (SND_PORT_MAX - SND_PORT_MIN)/PORT_STEP)
+						   if(cnt >= (SND_PORT_MAX - SND_PORT_MIN)/PORT_STEP -1)
 						   {
 							   printf("not find available udp snd port = %d\n", cnt);
 							   break;
@@ -1290,7 +1288,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 						   int cnt=0;
 						   cnt = g_hash_table_size(Hashtbl_Tcp_sink_snd_port);
 
-						   if(cnt >= (SND_PORT_MAX - SND_PORT_MIN)/PORT_STEP)
+						   if(cnt >= (SND_PORT_MAX - SND_PORT_MIN)/PORT_STEP -1)
 						   {
 							   printf("not find available udp rcv port = %d\n", cnt);
 							   break;
@@ -1447,7 +1445,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 						 gst_ptr->sink->src_port = sink_src_port;
 						 gst_ptr->sink->dst_port = sink_dst_port;
 						 gst_ptr->sink->type = sink_type;
-						 printf("gst_ptr->sink->type %d\n", gst_ptr->sink->type);
+						// printf("gst_ptr->sink->type %d\n", gst_ptr->sink->type);
 						 gst_ptr->source.type = src_type;
 						 bzero(gst_ptr->source.rtspaddr,100);
 						 g_stpcpy(gst_ptr->source.rtspaddr, rtspaddr);
@@ -1682,7 +1680,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 					printf(" waitting thread exit \n");
 					g_thread_join(tmp->gthread);
-
+					gst_bus_remove_signal_watch(tmp->bus);
 
 					g_mutex_lock (&gst_mutex);
 					if(g_hash_table_remove(gsthashtbale,tmp->callid))
@@ -1755,7 +1753,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 								printf(" waitting thread exit \n");
 								g_thread_join(tmp->gthread);
-
+								gst_bus_remove_signal_watch(tmp->bus);
 
 							//printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 								g_mutex_lock (&gst_mutex);
@@ -2044,7 +2042,7 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  	    gst_bin_add_many (GST_BIN (gstcustom->pipeline), gst_object_ref (sink->queue),gst_object_ref (sink->sink), NULL);
  	    if(gst_element_link_many (sink->queue, sink->sink, NULL) != TRUE)
  	    {
- 	    	g_printerr ("link error .\n");
+ 	    	printf ("link error .\n");
  	    	// need add error process
  	    }
 
@@ -2057,7 +2055,7 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
 
  	    if (gst_pad_link (sink->teepad, sinkpad) != GST_PAD_LINK_OK)
  	    {
- 	    	g_printerr ("Tee could not be linked.\n");
+ 	    	printf ("Tee could not be linked.\n");
  	    	// need add error process
  	    }
 
@@ -2183,7 +2181,7 @@ keep_alive_timed_out_cb (GSocket      *client,
     if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_TIMED_OUT))
 	{
 
-    //	g_printerr ("keep alive timeout from socket: %s\n",	  error->message);
+    //	printf ("keep alive timeout from socket: %s\n",	  error->message);
 
      	printf(" sipuri %s, callid %s not receive keeplive \n", sink->sipuri,sink->callid);
 
@@ -2280,7 +2278,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 		//printf("flag = %d\n", flag);
 		if(flag == 0)
 			return ;
-	   // g_printerr ("ERROR:  %s\n", err->message);
+	   // printf ("ERROR:  %s\n", err->message);
 		g_assert(err == NULL);
 
 		//g_socket_set_blocking( sink.sndkeepalive_socket, FALSE);
