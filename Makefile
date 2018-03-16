@@ -23,7 +23,9 @@ gst-proxy:
 test:
 	gcc test.c -o test `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gstreamer-mpegts-1.0 `
 
-
+test11:
+	gcc test11.c -o test11 `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gstreamer-mpegts-1.0 `
+	
 testtcpserver:
 	gcc test-tcpserver.c -o testtcpserver `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gstreamer-mpegts-1.0 `
 

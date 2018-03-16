@@ -837,7 +837,8 @@ exit:
 	     g_object_set (gstcustom->sink.sink, "sync", FALSE ,NULL);
 	   //  g_object_set (gstcustom->sink->sink, "max-lateness", 20000000 ,NULL);
 
-        gst_bin_add_many (GST_BIN (gstcustom->pipeline), gst_object_ref (gstcustom->sink.queue),gst_object_ref (gstcustom->sink.sink), NULL);
+   //     gst_bin_add_many (GST_BIN (gstcustom->pipeline), gst_object_ref (gstcustom->sink.queue),gst_object_ref (gstcustom->sink.sink), NULL);
+         gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->sink.queue,gstcustom->sink.sink, NULL);
 	   // gst_bin_add_many (GST_BIN (gstcustom->pipeline),gstcustom->sink->queue, gstcustom->sink->sink, NULL);
 	    if(gst_element_link_many (gstcustom->sink.queue, gstcustom->sink.sink, NULL) != TRUE)
 	    {
