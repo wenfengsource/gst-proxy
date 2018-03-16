@@ -1166,7 +1166,7 @@ int udp_port_available_check(int port)
 	//int port = 8888;
 	int flag = 0;
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
-	printf("fd = %d \n", fd);
+	//printf("fd = %d \n", fd);
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
