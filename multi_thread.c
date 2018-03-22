@@ -216,15 +216,15 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
-			sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;sinktype=3;",pt+14, gst_ptr->sipuri);
+			sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;",pt+14, gst_ptr->sipuri);
 			send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
 			g_mutex_unlock (&snd_data_mutex);
 
-			g_mutex_lock (&snd_data_mutex);
-			bzero(tx_buf,sizeof(tx_buf));
-			sprintf(tx_buf,"code=1002;sipuri=%s;callid=%s;",gst_ptr->sipuri,pt+14);
-			send_packet(tx_buf,strlen(tx_buf),g_remote_ip,LISTEN_PORT);
-			g_mutex_unlock (&snd_data_mutex);
+//			g_mutex_lock (&snd_data_mutex);
+//			bzero(tx_buf,sizeof(tx_buf));
+//			sprintf(tx_buf,"code=1002;sipuri=%s;callid=%s;",gst_ptr->sipuri,pt+14);
+//			send_packet(tx_buf,strlen(tx_buf),g_remote_ip,LISTEN_PORT);
+//			g_mutex_unlock (&snd_data_mutex);
 
 			g_free (ele_name);
 			break;
@@ -251,12 +251,12 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
 		g_mutex_unlock (&snd_data_mutex);
 
-		g_mutex_lock (&snd_data_mutex);
-		bzero(tx_buf,sizeof(tx_buf));
-	//	sprintf(tx_buf,"sipuri=%s;callid=%s;senddata=false;",gst_ptr->sip_uri,pt1+13);   //  it not happen in normal state
-		sprintf(tx_buf,"code=1002;sipuri=%s;callid=%s;",gst_ptr->sipuri,pt1+13);
-		send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
-		g_mutex_unlock (&snd_data_mutex);
+//		g_mutex_lock (&snd_data_mutex);
+//		bzero(tx_buf,sizeof(tx_buf));
+//	//	sprintf(tx_buf,"sipuri=%s;callid=%s;senddata=false;",gst_ptr->sip_uri,pt1+13);   //  it not happen in normal state
+//		sprintf(tx_buf,"code=1002;sipuri=%s;callid=%s;",gst_ptr->sipuri,pt1+13);
+//		send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
+//		g_mutex_unlock (&snd_data_mutex);
 
 		g_free (ele_name);
 		break;
@@ -278,12 +278,12 @@ message_cb (GstBus * bus, GstMessage * message, gpointer user_data)
 		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
 		g_mutex_unlock (&snd_data_mutex);
 
-		g_mutex_lock (&snd_data_mutex);
-		bzero(tx_buf,sizeof(tx_buf));
-		//sprintf(tx_buf,"sipuri=%s;callid=%s;senddata=false;",gst_ptr->sip_uri,pt2+14);   // it not happen in normal state
-		sprintf(tx_buf,"code=1002;sipuri=%s;callid=%s;",gst_ptr->sipuri,pt2+14);
-		send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
-		g_mutex_unlock (&snd_data_mutex);
+//		g_mutex_lock (&snd_data_mutex);
+//		bzero(tx_buf,sizeof(tx_buf));
+//		//sprintf(tx_buf,"sipuri=%s;callid=%s;senddata=false;",gst_ptr->sip_uri,pt2+14);   // it not happen in normal state
+//		sprintf(tx_buf,"code=1002;sipuri=%s;callid=%s;",gst_ptr->sipuri,pt2+14);
+//		send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
+//		g_mutex_unlock (&snd_data_mutex);
 
 		g_free (ele_name);
 		break;
@@ -879,11 +879,12 @@ exit:
 		{
 			gchar tmp[100];
 			sprintf(tmp,"tcpclientsink:%s",gstcustom->callid);
-
+            printf("gstcustom->sink->src_port =%d \n",gstcustom->sink->src_port);
 			gstcustom->sink->sink = gst_element_factory_make ("tcpclientsink", tmp);
 			g_object_set (gstcustom->sink->sink, "host", gstcustom->sink->dst_ip, NULL);
 			g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->dst_port , NULL);
-			g_object_set (gstcustom->sink->sink, "jftcpstring", gstcustom->sink->jftcpstring , NULL);
+			 g_object_set (gstcustom->sink->sink, "jftcpstring", gstcustom->sink->jftcpstring , NULL);
+		//	g_object_set (gstcustom->sink->sink, "jftcpstring","11111" , NULL);
 			g_object_set (gstcustom->sink->sink, "jftcpflag", 0 , NULL);
 			g_object_set (gstcustom->sink->sink, "bindport", gstcustom->sink->src_port , NULL);
 			g_object_set (gstcustom->sink->sink, "bindip", LOCAL_IP ,NULL);
@@ -1168,7 +1169,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
 
-			sprintf(tx_buf,"sipuri=%s;callid=%s;sourcedstip=%s;sourcedstport=%d;sinksrcip=%s;sinksrcport=%d",callid,callid,g_nat_ip,rcv_port,g_nat_ip,snd_port);
+			sprintf(tx_buf,"sipuri=%s;callid=%s;sourcedstip=%s;sourcedstport=%d;sinksrcip=%s;sinksrcport=%d",sipuri,callid,g_nat_ip,rcv_port,g_nat_ip,snd_port);
 			send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT_ACK);
 			g_mutex_unlock (&snd_data_mutex);
 			 printf("tx_buf -----%s \n", tx_buf);
