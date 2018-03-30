@@ -465,7 +465,7 @@ void cb_tcp_client_add  (GstElement* object, GSocket *arg0, gpointer user_data)
 		g_mutex_lock (&snd_data_mutex);
 		bzero(tx_buf,sizeof(tx_buf));
 		sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;",gst->callid, gst->sipuri);
-		send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
+	//	send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
 		g_mutex_unlock (&snd_data_mutex);
 
 	}
@@ -2346,7 +2346,7 @@ int  main (int argc, char **argv)
    // add_source(NULL);
     GThread *cmdthread =  g_thread_new("cmd_thread",cmd_thread,NULL);
 
-    g_timeout_add_seconds(30,time_ticket ,NULL);
+    g_timeout_add_seconds(10,time_ticket ,NULL);
 
  	 g_main_loop_run (loop);
 
