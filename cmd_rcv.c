@@ -915,6 +915,24 @@ int audio_codec_parse(char *buff, int len)
 	return 2;
 }
 
+int rtsp_protocol_parse(char *buff, int len)
+{
+	int i=0, j=0, k=0;
+	int cnt;
+	int flag =0;
+
+    if(strstr(buff,"RTSP_PROTOCOL=TCP"))
+	{
+    	return 1;   // TCP
+	}
+    else if(strstr(buff,"RTSP_PROTOCOL=UDP"))
+    {
+    	return 2;   // UDP
+    }
+    // default
+	return 2;
+}
+
 
 int control_ip_parse(char *buff, int len, char *dst_ip)
 {

@@ -65,6 +65,10 @@ unsigned char rx_buf[1500];
 #define CODEC_AAC     1
 #define CODEC_PCMULAW  2
 int g_audio_codec= CODEC_PCMULAW ;
+
+#define RTP_OVER_RTSP  1
+#define RTP_OVER_UDP   2
+int g_rtsp_protocol= RTP_OVER_UDP ;
 int cnt;
 
 //GHashTable *Hashtbl_Udp_Source_rcv_port; // callid and port
@@ -803,6 +807,12 @@ exit:
 		// printf("==========%s======%s \n", gstcustom->source.src_ip, tmp);
 		 printf("rtsp = %s \n", gstcustom->source.rtspaddr);
 		 g_object_set (gstcustom->source.src, "location",gstcustom->source.rtspaddr, NULL);
+
+		 if(g_rtsp_protocol == RTP_OVER_RTSP)
+		 {
+			 g_object_set (gstcustom->source.src, "protocols",0x00000004, NULL);
+		 }
+
 		 g_object_set (gstcustom->source.h264parse, "config-interval",1, NULL);
 		 g_object_set (gstcustom->source.mpegtsmux, "alignment",7, NULL);
 
@@ -2309,6 +2319,8 @@ int  main (int argc, char **argv)
 		fclose(fp);
 		return 1;
 	}
+
+	g_rtsp_protocol = rtsp_protocol_parse(tx_buf, size);
 
 	g_audio_codec= audio_codec_parse(tx_buf, size);
 
