@@ -83,6 +83,7 @@ typedef struct
 	GstElement *aacparse;
 
 	GstElement *mpegtsmux;
+	GstElement *rndbuffersize;
 	GstElement *tee;
 	GstElement *capsfilter;
 

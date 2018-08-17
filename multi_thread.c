@@ -645,10 +645,11 @@ exit:
 		g_object_set (gstcustom->source.src, "retrieve-sender-address", FALSE,NULL);
 
 		g_object_set (gstcustom->source.src, "keep-alive-time",5,NULL); // for test
-		if(gstcustom->source.keep_alive_str_lenth == 0)
+		if((strstr(gstcustom->source.keep_alive_str, "ccff") != NULL) || (strstr(gstcustom->source.keep_alive_str, "CCFF") != NULL)
+				|| gstcustom->source.keep_alive_str[0] == 0)
 		{
 			g_object_set (gstcustom->source.src, "keep-alive-len", 10, NULL);
-			g_object_set (gstcustom->source.src, "keep-alive-string","hello_word",NULL);
+			g_object_set (gstcustom->source.src, "keep-alive-string","ccff",NULL);
 		}
 		else
 		{
@@ -736,86 +737,156 @@ exit:
 	}
 	else if(gstcustom->source.type == RTSP)
 	{
-			gstcustom->source.src = gst_element_factory_make ("rtspsrc", "rtspsrc");
-			gstcustom->source.h264depay = gst_element_factory_make ("rtph264depay", "rtph264depay");
-			gstcustom->source.h264parse = gst_element_factory_make ("h264parse", "h264parse");
+		    if(strstr(gstcustom->source.rtspaddr,"mpeg4"))
+		    {
 
-			gstcustom->source.mpegtsmux = gst_element_factory_make ("mpegtsmux", "mpegtsmux");
-			gstcustom->source.tee = gst_element_factory_make ("tee", "tee");
+				gstcustom->source.src = gst_element_factory_make ("rtspsrc", "rtspsrc");
+				gstcustom->source.h264depay = gst_element_factory_make ("rtpmp4vdepay", "rtpmp4vdepay");
+				gstcustom->source.h264parse = gst_element_factory_make ("mpeg4videoparse", "mpeg4videoparse");
+				gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
+				gstcustom->source.mpegtsmux = gst_element_factory_make ("mpegpsmux", "mpegpsmux");
+				gstcustom->source.tee = gst_element_factory_make ("tee", "tee");
 
-			if(g_audio_codec==CODEC_AAC)
+				//if(g_audio_codec==CODEC_AAC)
+				{
+					gstcustom->source.aacparse = gst_element_factory_make ("mpegaudioparse", "mpegaudioparse");
+					gstcustom->source.audiodepay = gst_element_factory_make ("rtpmpadepay", "rtpmpadepay");
+
+
+				//	gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
+
+					if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
+									|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.rndbuffersize || !gstcustom->source.tee) {
+									g_error ("Failed to create elements");
+									return -1;
+					}
+
+
+					gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,
+							gstcustom->source.aacparse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.rndbuffersize, gstcustom->source.tee,NULL);
+
+					if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.rndbuffersize,gstcustom->source.tee, NULL))
+					{
+						g_error ("Failed to link elements");
+						return -2;
+					}
+					if (!gst_element_link_many ( gstcustom->source.audiodepay,gstcustom->source.aacparse,gstcustom->source.mpegtsmux, NULL))
+					{
+						g_error ("Failed to link elements");
+						return -2;
+					}
+				}
+//				else if(g_audio_codec==CODEC_PCMULAW)
+//				{
+//					printf();
+//				}
+
+
+
+			 g_signal_connect (gstcustom->source.src, "pad-added", (GCallback)pad_added_handler_for_rtsp, gstcustom);
+
+			// char tmp[100];
+			// memset(tmp,0,100);
+			// sprintf(tmp,"rtsp://%s:554/Streaming/Channels/101",gstcustom->source.src_ip);
+			// printf("==========%s======%s \n", gstcustom->source.src_ip, tmp);
+			 printf("rtsp = %s \n", gstcustom->source.rtspaddr);
+			 g_object_set (gstcustom->source.src, "location",gstcustom->source.rtspaddr, NULL);
+			 g_object_set (gstcustom->source.rndbuffersize, "min",1316, NULL);
+			 g_object_set (gstcustom->source.rndbuffersize, "max",1316, NULL);
+
+			 if(g_rtsp_protocol == RTP_OVER_RTSP)
+			 {
+				// g_object_set (gstcustom->source.src, "protocols",0x00000004, NULL);
+			 }
+
+			// g_object_set (gstcustom->source.h264parse, "config-interval",1, NULL);
+			 g_object_set (gstcustom->source.mpegtsmux, "alignment",7, NULL);
+
+
+		    }
+		    else
 			{
-				gstcustom->source.aacparse = gst_element_factory_make ("aacparse", "aacparse");
-				gstcustom->source.audiodepay = gst_element_factory_make ("rtpmp4gdepay", "rtpmp4gdepay");
+				gstcustom->source.src = gst_element_factory_make ("rtspsrc", "rtspsrc");
+				gstcustom->source.h264depay = gst_element_factory_make ("rtph264depay", "rtph264depay");
+				gstcustom->source.h264parse = gst_element_factory_make ("h264parse", "h264parse");
 
+				gstcustom->source.mpegtsmux = gst_element_factory_make ("mpegtsmux", "mpegtsmux");
+				gstcustom->source.tee = gst_element_factory_make ("tee", "tee");
 
-			//	gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
-
-				if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
-								|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.tee) {
-								g_error ("Failed to create elements");
-								return -1;
-				}
-
-
-				gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,
-						gstcustom->source.aacparse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.tee,NULL);
-
-				if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.tee, NULL))
+				if(g_audio_codec==CODEC_AAC)
 				{
-					g_error ("Failed to link elements");
-					return -2;
+					gstcustom->source.aacparse = gst_element_factory_make ("aacparse", "aacparse");
+					gstcustom->source.audiodepay = gst_element_factory_make ("rtpmp4gdepay", "rtpmp4gdepay");
+
+
+				//	gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
+
+					if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
+									|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.tee) {
+									g_error ("Failed to create elements");
+									return -1;
+					}
+
+
+					gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,
+							gstcustom->source.aacparse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.tee,NULL);
+
+					if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.tee, NULL))
+					{
+						g_error ("Failed to link elements");
+						return -2;
+					}
+					if (!gst_element_link_many ( gstcustom->source.audiodepay,gstcustom->source.aacparse,gstcustom->source.mpegtsmux, NULL))
+					{
+						g_error ("Failed to link elements");
+						return -2;
+					}
 				}
-				if (!gst_element_link_many ( gstcustom->source.audiodepay,gstcustom->source.aacparse,gstcustom->source.mpegtsmux, NULL))
+				else if(g_audio_codec==CODEC_PCMULAW)
 				{
-					g_error ("Failed to link elements");
-					return -2;
+					gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
+
+					if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
+									|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.tee) {
+									g_error ("Failed to create elements");
+									return -1;
+					}
+
+
+					gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.tee,NULL);
+					if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.tee, NULL))
+					{
+						g_error ("Failed to link elements");
+						return -2;
+					}
+					if (!gst_element_link_many ( gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, NULL))
+					{
+						g_error ("Failed to link elements");
+						return -2;
+					}
+
 				}
+
+
+
+			 g_signal_connect (gstcustom->source.src, "pad-added", (GCallback)pad_added_handler_for_rtsp, gstcustom);
+
+			// char tmp[100];
+			// memset(tmp,0,100);
+			// sprintf(tmp,"rtsp://%s:554/Streaming/Channels/101",gstcustom->source.src_ip);
+			// printf("==========%s======%s \n", gstcustom->source.src_ip, tmp);
+			 printf("rtsp = %s \n", gstcustom->source.rtspaddr);
+			 g_object_set (gstcustom->source.src, "location",gstcustom->source.rtspaddr, NULL);
+
+			 if(g_rtsp_protocol == RTP_OVER_RTSP)
+			 {
+				 g_object_set (gstcustom->source.src, "protocols",0x00000004, NULL);
+			 }
+
+			 g_object_set (gstcustom->source.h264parse, "config-interval",1, NULL);
+			 g_object_set (gstcustom->source.mpegtsmux, "alignment",7, NULL);
+
 			}
-			else if(g_audio_codec==CODEC_PCMULAW)
-			{
-				gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
-
-				if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
-								|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.tee) {
-								g_error ("Failed to create elements");
-								return -1;
-				}
-
-
-				gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.tee,NULL);
-				if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.tee, NULL))
-				{
-					g_error ("Failed to link elements");
-					return -2;
-				}
-				if (!gst_element_link_many ( gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, NULL))
-				{
-					g_error ("Failed to link elements");
-					return -2;
-				}
-
-			}
-
-
-
-		 g_signal_connect (gstcustom->source.src, "pad-added", (GCallback)pad_added_handler_for_rtsp, gstcustom);
-
-		// char tmp[100];
-		// memset(tmp,0,100);
-		// sprintf(tmp,"rtsp://%s:554/Streaming/Channels/101",gstcustom->source.src_ip);
-		// printf("==========%s======%s \n", gstcustom->source.src_ip, tmp);
-		 printf("rtsp = %s \n", gstcustom->source.rtspaddr);
-		 g_object_set (gstcustom->source.src, "location",gstcustom->source.rtspaddr, NULL);
-
-		 if(g_rtsp_protocol == RTP_OVER_RTSP)
-		 {
-			 g_object_set (gstcustom->source.src, "protocols",0x00000004, NULL);
-		 }
-
-		 g_object_set (gstcustom->source.h264parse, "config-interval",1, NULL);
-		 g_object_set (gstcustom->source.mpegtsmux, "alignment",7, NULL);
-
 	}
 
 	gstcustom->bus = gst_pipeline_get_bus (GST_PIPELINE (gstcustom->pipeline));
@@ -899,7 +970,7 @@ exit:
 			g_object_set (gstcustom->sink->sink, "bindport", gstcustom->sink->src_port , NULL);
 			g_object_set (gstcustom->sink->sink, "bindip", LOCAL_IP ,NULL);
 
-		//	g_object_set (gstcustom->sink->sink, "block", FALSE ,NULL);
+		 	g_object_set (gstcustom->sink->sink, "block", FALSE ,NULL);
 		}
 
 	    g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);  // buffer leak data
@@ -1858,10 +1929,10 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  			g_object_set (gstcustom->sink->sink, "host", gstcustom->sink->dst_ip, NULL);
  			g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->dst_port , NULL);
  			g_object_set (gstcustom->sink->sink, "jftcpstring", gstcustom->sink->jftcpstring , NULL);
- 			g_object_set (gstcustom->sink->sink, "jftcpflag", 1 , NULL);
+ 			g_object_set (gstcustom->sink->sink, "jftcpflag", 0 , NULL);
  			g_object_set (gstcustom->sink->sink, "bindport", gstcustom->sink->src_port , NULL);
  			g_object_set (gstcustom->sink->sink, "bindip", LOCAL_IP ,NULL);
- 		//	g_object_set (gstcustom->sink->sink, "block", FALSE ,NULL);
+ 		 	g_object_set (gstcustom->sink->sink, "block", FALSE ,NULL);
 
 
  		}
