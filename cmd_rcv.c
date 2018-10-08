@@ -401,7 +401,7 @@ int sink_keep_alive_parse(char *buff, int len)
 		if(memcmp(&buff[i], "sinkplv=ok", 10) == 0)
 		{
 
-		//	 printf("find sinkplv=ok \n");
+		 	 printf("find sinkplv=ok \n");
 			 return TRUE;
 		}
 
@@ -531,6 +531,32 @@ int rtspaddr_parse(char *buff, int len, char *rtspaddr)
 	}
 	return  0;
 
+}
+
+int rtsp_server_uri_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	memset(type,0,6);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "rtsp_server_uri=stream", 22) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+22;
+			 printf("rtsp server address =%d \n" ,atoi(&buff[i]));
+
+		 	 return atoi(&buff[i]);
+		}
+
+
+
+	}
+	return  -1;
 }
 
 int jftcpstring_parse(char *buff, int len, char *jftcp)

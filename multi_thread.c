@@ -1,5 +1,8 @@
 #include <string.h>
 #include <gst/gst.h>
+#include <gst/rtsp-server/rtsp-server.h>
+#include <gst/rtsp-server/rtsp-media-factory-uri.h>
+
 #include <stdio.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -26,6 +29,8 @@
 //#define JFTCP  5
 #define TCPCLIENT 3
 #define TCPSERVER 5
+
+#define  RTSP_CLIENT_CNT    60
 
 //#define DEBUG        0
 
@@ -88,6 +93,7 @@ GMainLoop* loop;
 GstCustom gstdata;
 
 GHashTable *gsthashtbale;
+GHashTable *hashRtspServerUri;
 static GMutex gst_mutex;
 static GMutex snd_data_mutex;
 static GMutex tcpclienthash_mutex;
@@ -95,6 +101,11 @@ static GMutex tcpclienthash_mutex;
 static GSocket *backup_sock;
 static GstElement *backup_element;
 static GSocket *g_socket;
+
+GstRTSPServer *server;
+GstRTSPMountPoints *mounts;
+GstRTSPMediaFactoryURI *factory[RTSP_CLIENT_CNT];
+
 int fd;
 extern int exit_flag;
 void *new_pipeline_thread( gpointer *arg);
@@ -586,6 +597,32 @@ exit:
   gst_object_unref (sink_pad);
 }
 
+
+
+GstRTSPFilterResult ClientFilterFunc (GstRTSPServer *server,
+                                  GstRTSPClient *client,
+                                  gpointer user_data)
+{
+	//  GST_RTSP_FILTER_REMOVE,
+  //GST_RTSP_FILTER_KEEP,
+  //GST_RTSP_FILTER_REF,
+
+     char *ptr = (char *)user_data;
+
+	  //priv->server_ip;
+    // printf("remove ptr= %s client ===path %s  %p\n", ptr, gst_rtsp_client_get_path(client), client);
+	   if(strstr(gst_rtsp_client_get_path(client),ptr) !=NULL)
+	   {
+		   printf("remove client path %s  %p\n",  gst_rtsp_client_get_path(client), client);
+		   return GST_RTSP_FILTER_REMOVE;
+	   }
+	   // GST_INFO ("reusing cached media  for path %s",  priv->path);
+	 //return GST_RTSP_FILTER_REMOVE;
+	  return GST_RTSP_FILTER_KEEP;
+}
+
+
+
  int Create_source_sink_pipeline( GstCustom *gstcustom)
 {
 	 if(gstcustom->source.type == RTSP)
@@ -1052,7 +1089,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 		char sipuri[100], sink_dst_uri[30], sink_dst_ip[20], sink_src_ip[20], source_src_ip[20],source_dst_ip[20];
 		char gst_hashtable_key[100],  callid[100], rtspaddr[100];
-
+        char rtsp_server_uri[30];
 
 		 printf("waitting data.... \n");
 		 memset(rx_buf, 0 ,1500);
@@ -1287,7 +1324,7 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 //		}
 //
 
-		if((invite_flag ==1) && (sink_dst_ip_parse(rx_buf, rcv_size,sink_dst_ip) == 0))
+		if((invite_flag ==1) && (sink_dst_ip_parse(rx_buf, rcv_size,sink_dst_ip) == 0) && sink_type != RTSP)
 		{
 			printf("not find sink_dst_ip \n");
 			//return 0;
@@ -1322,6 +1359,34 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 			g_mutex_unlock (&snd_data_mutex);
 			//printf("tx_buf -----%s \n", tx_buf);
 
+			// check rtsp server steam id if is available
+			 if(sink_type == RTSP)
+			 {
+				 int port = rtsp_server_uri_parse(rx_buf, rcv_size); // rtspserver uri streamid
+				 if(port >=0 && port < RTSP_CLIENT_CNT)
+				 {
+					 char key[10] ={0};
+					 bzero(key, sizeof(key));
+					 sprintf(key,"/stream%d",port);
+					 gpointer ptr = g_hash_table_lookup (hashRtspServerUri, key);
+
+					 if(ptr !=NULL)
+					 {
+						//  gst_rtsp_server_client_filter (server,ClientFilterFunc, key);
+						  printf("callid %s used rtsp server uri=stream%d \n", ptr,port);
+						  continue;
+						 // the port is used
+					 }
+
+				 }
+				 else
+				 {
+					 // rtsp server uri address is unvalueable
+					  printf("callid %s rtsp server uri=stream%d is unavailable\n", callid,port);
+					 continue;
+				 }
+		    }
+
 			switch(src_type)
 			{
 
@@ -1337,11 +1402,11 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 
 				if(tmp != 0)  // src session id is esstibition
 				{
-					printf("src session callid id= is esstibition %s \n",callid);
+					printf("src session callid id= %s is esstibition \n",callid);
 				}
 				else     // src session is not build, create new pipeline
 				{
-					if(sink_type == UDP || sink_type == TCPSERVER || sink_type == TCPCLIENT)
+					if(sink_type == UDP || sink_type == TCPSERVER || sink_type == TCPCLIENT || sink_type == RTSP)
 					{
 					   // check udp type src pipeline if is created
 						 printf("create pipeline \n");
@@ -1405,7 +1470,57 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 							memset(gst_ptr->sink->jftcpstring,0,301);
 							jftcpstring_parse(rx_buf, rcv_size, gst_ptr->sink->jftcpstring);
 						}
+					    else if(sink_type == RTSP)
+						{
+							//rtsp_server_uri
+							// g_stpcpy(gst_ptr->sink->src_ip, sink_src_ip);
+							 // accord rtsp_server_uri set udp dst port,
+							 // check is has rtsp server uri, if had , set bye first
+							// if()
+							//bzero(rtsp_server_uri,sizeof(rtsp_server_uri));
+							 int port = rtsp_server_uri_parse(rx_buf, rcv_size); // rtspserver uri streamid
+							 if(port >=0 && port < RTSP_CLIENT_CNT)
+							 {
+								 char key[10] ={0};
+								 bzero(key, sizeof(key));
+								 sprintf(key,"/stream%d",port);
+								 gpointer ptr = g_hash_table_lookup (hashRtspServerUri, key);
+
+
+								  printf("inset hashRtspServerUri key %s \n", key);
+								 g_hash_table_insert (hashRtspServerUri, strdup(key), strdup(callid));
+
+
+								 g_stpcpy(gst_ptr->sink->dst_ip, "0.0.0.0");
+								 gst_ptr->sink->dst_port = 1600+port;
+								 gst_ptr->sink->type = UDP;
+
+								 //char rtsp_uri[20];
+							     //memset(rtsp_uri,0,20);
+								// sprintf(rtsp_uri,"/stream%d",port);
+								 char uri[30];
+							    	memset(uri,0,30);
+							    	sprintf(uri,"udp://0.0.0.0:%d",(port+1600));
+							 	factory[port] = gst_rtsp_media_factory_uri_new ();
+							 		 gst_rtsp_media_factory_uri_set_uri (factory[port], uri);
+
+								 mounts = gst_rtsp_server_get_mount_points (server);
+								 printf("factory = %p \n",factory[port]);
+								// gst_rtsp_media_factory_set_shared(factory[port],1);
+								gst_rtsp_mount_points_add_factory (mounts,  key,
+									      GST_RTSP_MEDIA_FACTORY (factory[port]));
+								 g_object_unref (mounts);
+
+
+							 }
+							 else
+							 {
+								 // rtsp server uri address is unvalueable
+								 continue;
+							 }
+						}
 						 gst_ptr->gthread  = g_thread_new("jieshouip:port", new_pipeline_thread , gst_ptr);
+
 
 					}
 					else if(sink_type == RTP)
@@ -1614,12 +1729,30 @@ void foreach_gst_hashtab(gpointer key, gpointer value, gpointer user_data)
 					gst_bus_remove_signal_watch(tmp->bus);
 					gst_object_unref (GST_OBJECT (tmp->bus));
 
+					if(tmp->sink->type == UDP && tmp->sink->dst_port >=1600 && tmp->sink->dst_port < 1600 + RTSP_CLIENT_CNT)
+					{
+						char key[10];
+						bzero(key,sizeof(key));
+						sprintf(key,"/stream%d",tmp->sink->dst_port- 1600);
+						if(g_hash_table_remove(hashRtspServerUri,key))
+						{
+							// remove rtsp client
+						 	gst_rtsp_server_client_filter (server,ClientFilterFunc, key);
+						 	 mounts = gst_rtsp_server_get_mount_points (server);
+						 	gst_rtsp_mount_points_remove_factory (mounts, key);
+							printf("hashRtspServerUri remove stream%d  \n",(tmp->sink->dst_port - 1600));
+							 g_object_unref (mounts);
+						}
+
+					}
+
 					g_mutex_lock (&gst_mutex);
 					if(g_hash_table_remove(gsthashtbale,tmp->callid))
 					{
 						printf("remove session from gsthashtbale of callid %s  \n", tmp->callid);
 					}
 					g_mutex_unlock (&gst_mutex);
+
 					//return;
 					continue;
 				}
@@ -2193,6 +2326,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 	 if((sink->keep_alive_flag == FALSE && sink->Nat_Traversal == FALSE) || sink->type == TCPSERVER || sink->type == TCPCLIENT)
 	 {
 		 //Create socket for receive data
+		 printf("unnecessary create socket by self \n");
 		 return;
 	 }
 
@@ -2208,6 +2342,9 @@ keep_alive_timed_out_cb (GSocket      *client,
 		g_assert(err == NULL);
 
 	    printf("Create sink socket src_port %d \n ", sink->src_port);
+
+#if 0
+	    sink->src_port = 60004;
 		flag= g_socket_bind(sink->sndkeepalive_socket,
 		 	              G_SOCKET_ADDRESS(g_inet_socket_address_new(g_inet_address_new_from_string(LOCAL_IP) ,sink->src_port)),
 		 	              TRUE,
@@ -2217,7 +2354,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 			return ;
 	   // printf ("ERROR:  %s\n", err->message);
 		g_assert(err == NULL);
-
+#endif
 		//g_socket_set_blocking( sink.sndkeepalive_socket, FALSE);
 		 GError *opt_err = NULL;
 		if (!g_socket_set_option (sink->sndkeepalive_socket, SOL_SOCKET, SO_SNDBUF,
@@ -2337,6 +2474,7 @@ int time_ticket()
 }
 
 
+
 int  main (int argc, char **argv)
 {
 	//  GMainContext *context;
@@ -2415,6 +2553,7 @@ int  main (int argc, char **argv)
      loop = g_main_loop_new (NULL, FALSE);
 
     gsthashtbale = g_hash_table_new_full (g_str_hash , g_str_equal ,free_sipuri_key,  free_sipuri_value);
+    hashRtspServerUri = g_hash_table_new_full (g_str_hash , g_str_equal ,free_key,  free_value);
 
 
    // Hashtbl_Udp_Source_rcv_port = g_hash_table_new_full (g_str_hash , g_str_equal ,free_udp_rcv_port_key,print_port_value);
@@ -2429,6 +2568,53 @@ int  main (int argc, char **argv)
    // add_source(NULL);
     GThread *cmdthread =  g_thread_new("cmd_thread",cmd_thread,NULL);
 
+
+    /* create a server instance */
+    server = gst_rtsp_server_new ();
+    g_object_set (server, "service", "8554", NULL);
+    gst_rtsp_server_set_backlog(server, 100);  //rtsp client max count
+
+
+#if 0
+    /* get the mount points for this server, every server has a default object
+     * that be used to map uri mount points to media factories */
+    mounts = gst_rtsp_server_get_mount_points (server);
+
+
+    /* make a URI media factory for a test stream. */
+    char rtsp_uri[20];
+    char uri[30];
+    int i =0;
+    for( i=0; i<RTSP_CLIENT_CNT ; i++)
+    {
+    	memset(rtsp_uri,0,20);
+    	sprintf(rtsp_uri,"/stream%d",i);
+    	memset(uri,0,30);
+    	sprintf(uri,"udp://0.0.0.0:%d",i+1600);
+ 		//factory[i] = gst_rtsp_media_factory_uri_new ();
+ 		// gst_rtsp_media_factory_uri_set_uri (factory[i], uri);
+
+ 		//gst_rtsp_media_factory_set_shared(factory[i],1);
+
+		// gst_rtsp_mount_points_add_factory (mounts,  rtsp_uri, GST_RTSP_MEDIA_FACTORY (factory[i]));
+
+    }
+
+
+    /* don't need the ref to the mapper anymore */
+    g_object_unref (mounts);
+#endif
+    /* attach the server to the default maincontext */
+    if (gst_rtsp_server_attach (server, NULL) == 0)
+	{
+		printf("attach server error \n");
+	}
+
+    /* do session cleanup every 2 seconds */
+   // g_timeout_add_seconds (2, (GSourceFunc) timeout, server);
+  //  g_timeout_add_seconds (10, (GSourceFunc) remove_client, server);
+
+
     g_timeout_add_seconds(10,time_ticket ,NULL);
 
  	 g_main_loop_run (loop);
@@ -2436,6 +2622,13 @@ int  main (int argc, char **argv)
  	g_main_loop_unref (loop);
 // 	remove_source();
  	g_socket_close (g_socket,NULL);
+
+ 	int i;
+ 	for(i =0; i<RTSP_CLIENT_CNT; i++)
+ 	{
+ 		 g_object_unref (factory[i]);
+ 	}
+ 	g_object_unref (server);
 
 	return 0;
 }
