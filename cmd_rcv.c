@@ -933,12 +933,12 @@ int audio_codec_parse(char *buff, int len)
 	{
     	return 1;   // CODEC_AAC
 	}
-    else if(strstr(buff,"AUDIO_CODEC=AAC"))
+    else if(strstr(buff,"AUDIO_CODEC=PCMULAW"))
     {
     	return 2;   // CODEC_PCMULAW
     }
     // default
-	return 2;
+	return 3;
 }
 
 int rtsp_protocol_parse(char *buff, int len)
