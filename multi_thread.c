@@ -30,8 +30,8 @@
 #define TCPCLIENT 3
 #define TCPSERVER 5
 
-#define  RTSP_CLIENT_CNT    60
-
+int g_rtsp_channel_max_cnt=60;
+int rtsp_server_port=8554 ;
 //#define DEBUG        0
 
 static int rcv_port_min;
@@ -104,7 +104,7 @@ static GSocket *g_socket;
 
 GstRTSPServer *server;
 GstRTSPMountPoints *mounts;
-GstRTSPMediaFactoryURI *factory[RTSP_CLIENT_CNT];
+GstRTSPMediaFactoryURI *factory[200];
 
 int fd;
 extern int exit_flag;
@@ -1134,7 +1134,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 	signal(SIGINT, Stop);
 	char remote_ip[20];
 	//printf("cmd thread created \n");
-
+	static int rtsp_channel = 0;
 
 	 fflush(stdout);
 
@@ -1341,12 +1341,47 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 
 				}
 			}
+			else if(sink_type == RTSP)
+			{
+				  int i  = 0;
+				while(i++ < g_rtsp_channel_max_cnt)
+				{
+					 if(rtsp_channel >g_rtsp_channel_max_cnt)
+					 {
+						 rtsp_channel = 0;
+					 }
+
+
+					 char key[10] ={0};
+					 bzero(key, sizeof(key));
+					 sprintf(key,"/stream%d",rtsp_channel);
+					 gpointer ptr = g_hash_table_lookup (hashRtspServerUri, key);
+					 rtsp_channel++;
+
+
+					 if(ptr == NULL)
+					 {
+					    break;
+					 }
+
+				}
+				if(i >= g_rtsp_channel_max_cnt)
+				{
+					printf("not find available rtsp channel \n");
+				}
+			}
 
 
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
-
-			sprintf(tx_buf,"sipuri=%s;callid=%s;sourcedstip=%s;sourcedstport=%d;sinksrcip=%s;sinksrcport=%d",sipuri,callid,g_nat_ip,rcv_port,g_nat_ip,snd_port);
+            if(sink_type == RTSP)
+            {
+              	sprintf(tx_buf,"sipuri=%s;callid=%s;sourcedstip=%s;sourcedstport=%d;sinksrcip=%s;sinksrcport=%d;",sipuri,callid,g_nat_ip,rcv_port,g_nat_ip,rtsp_channel-1);
+            }
+            else
+            {
+            	sprintf(tx_buf,"sipuri=%s;callid=%s;sourcedstip=%s;sourcedstport=%d;sinksrcip=%s;sinksrcport=%d;",sipuri,callid,g_nat_ip,rcv_port,g_nat_ip,snd_port);
+            }
 			send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT_ACK);
 			g_mutex_unlock (&snd_data_mutex);
 			 printf("tx_buf -----%s \n", tx_buf);
@@ -1423,7 +1458,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 			 {
 				 int port = rtsp_server_uri_parse(rx_buf, rcv_size); // rtspserver uri streamid
 
-				 if(port >=0 && port < RTSP_CLIENT_CNT)
+				 if(port >=0 && port <= g_rtsp_channel_max_cnt)
 				 {
 					 char key[10] ={0};
 					 bzero(key, sizeof(key));
@@ -1570,7 +1605,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 							// if()
 							//bzero(rtsp_server_uri,sizeof(rtsp_server_uri));
 							 int port = rtsp_server_uri_parse(rx_buf, rcv_size); // rtspserver uri streamid
-							 if(port >=0 && port < RTSP_CLIENT_CNT)
+							 if(port >=0 && port < g_rtsp_channel_max_cnt)
 							 {
 								 char key[10] ={0};
 								 bzero(key, sizeof(key));
@@ -1825,7 +1860,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 					gst_bus_remove_signal_watch(tmp->bus);
 					gst_object_unref (GST_OBJECT (tmp->bus));
 
-//					if(tmp->sink->type == UDP && tmp->sink->dst_port >=1600 && tmp->sink->dst_port < 1600 + RTSP_CLIENT_CNT)
+//					if(tmp->sink->type == UDP && tmp->sink->dst_port >=1600 && tmp->sink->dst_port < 1600 + g_rtsp_channel_max_cnt)
 //					{
 //						char key[10];
 //						bzero(key,sizeof(key));
@@ -2625,6 +2660,14 @@ int  main (int argc, char **argv)
 		return 1;
 	}
 
+	g_rtsp_channel_max_cnt = Rtsp_channel_num_parse(tx_buf, size);
+	if(g_rtsp_channel_max_cnt == -1)
+	{
+		g_rtsp_channel_max_cnt = 60;
+		printf(" not find RTSP_CHANNEL_MAX_NUM , set default 60 \n");
+	}
+	rtsp_server_port = Rtsp_server_port_parse(tx_buf, size);
+
 	g_rtsp_protocol = rtsp_protocol_parse(tx_buf, size);
 
 	g_audio_codec= audio_codec_parse(tx_buf, size);
@@ -2667,8 +2710,10 @@ int  main (int argc, char **argv)
 
     /* create a server instance */
     server = gst_rtsp_server_new ();
-    g_object_set (server, "service", "8554", NULL);
-    gst_rtsp_server_set_backlog(server, 100);  //rtsp client max count
+    char port[10]={0};
+    sprintf(port,"%d",rtsp_server_port);
+    g_object_set (server, "service", port, NULL);
+    gst_rtsp_server_set_backlog(server, g_rtsp_channel_max_cnt);  //rtsp client max count
 
 
 #if 0
@@ -2681,7 +2726,7 @@ int  main (int argc, char **argv)
     char rtsp_uri[20];
     char uri[30];
     int i =0;
-    for( i=0; i<RTSP_CLIENT_CNT ; i++)
+    for( i=0; i<g_rtsp_channel_max_cnt ; i++)
     {
     	memset(rtsp_uri,0,20);
     	sprintf(rtsp_uri,"/stream%d",i);
@@ -2720,7 +2765,7 @@ int  main (int argc, char **argv)
  	g_socket_close (g_socket,NULL);
 
  	int i;
- 	for(i =0; i<RTSP_CLIENT_CNT; i++)
+ 	for(i =0; i<g_rtsp_channel_max_cnt; i++)
  	{
  		 g_object_unref (factory[i]);
  	}

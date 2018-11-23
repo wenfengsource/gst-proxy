@@ -369,6 +369,59 @@ int snd_min_port_parse(char *buff, int len)
 	return  61001;
 }
 
+int Rtsp_channel_num_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	memset(type,0,6);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "RTSP_CHANNEL_MAX_NUM=", 21) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+21;
+			 printf("RTSP_CHANNEL_MAX_NUM=%d \n" ,atoi(&buff[i]));
+
+		 	 return atoi(&buff[i]);
+		}
+
+
+
+	}
+	return  -1;
+}
+
+int Rtsp_server_port_parse(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+    char type[6];
+	memset(type,0,6);
+	for(i =0 ;i < len ; i++)
+	{
+		if(memcmp(&buff[i], "RTSP_SERVER_PORT=", 17) == 0)
+		{
+			 cnt = i;
+			 flag = 1;
+			 i=i+17;
+			 printf("RTSP_SERVER_PORT=%d \n" ,atoi(&buff[i]));
+
+		 	 return atoi(&buff[i]);
+		}
+
+
+
+	}
+	return  8554;
+}
+
+
 int snd_max_port_parse(char *buff, int len)
 {
 	int i=0, j=0;
