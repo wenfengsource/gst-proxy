@@ -23,6 +23,8 @@
 #define RCV_PORT       50001
 #define SND_PORT       50002
 
+
+
 int gRcvSocket;
 int gSndSocket;
 int exit_flag = False;
@@ -1068,6 +1070,21 @@ int get_total_session(char *buff, int len)
 
 	}
 	return 0;
+}
+
+int check_mux_type(char *buf )
+{
+	if(strstr(buf,"MUX_TYPE=PS") !=NULL)
+	{
+		 printf("mux type ps \n");
+			return 1; //MPEGPS;
+	}
+	else
+	{
+		printf("mux type ts \n");
+		return 2  ;// MPEGTS;
+	}
+
 }
 
 void keep_alive_string_parse(char *buff, int len, char *str)

@@ -13,6 +13,11 @@ multi_thread:
 	gcc multi_thread.c cmd_rcv.c hashtable.c -o media_distribute `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gio-2.0 gstreamer-rtsp-server-1.0`
 
 
+rtspsrc:
+	gcc gst_rtspsrc.c -o rtspsrc `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gio-2.0 gstreamer-rtsp-server-1.0`
+
+
+
 multi_test:
 	gcc multi_test.c cmd_rcv.c hashtable.c -o multi_test `pkg-config --cflags --libs gstreamer-1.0 gstreamer-app-1.0 gio-2.0`
 

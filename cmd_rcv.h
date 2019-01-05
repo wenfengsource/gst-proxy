@@ -8,5 +8,8 @@ int receive_packet(unsigned char *rx_buf);
 void Stop(int signo);
 
 
+#define MPEGPS         1
+#define MPEGTS         2
+
 
 #endif
