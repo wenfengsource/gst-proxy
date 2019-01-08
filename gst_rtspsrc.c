@@ -188,15 +188,15 @@ static void on_pad_added (GstElement *element,
     sink_pad = gst_element_get_static_pad (depay[0], "sink");
     src_pad = gst_element_get_static_pad (parser[0], "src");
 
-//gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER,
- //     (GstPadProbeCallback) cb_have_data, NULL, NULL);
+ gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER,
+       (GstPadProbeCallback) cb_have_data, NULL, NULL);
 
-GstPad *sinkpad;
+//GstPad *sinkpad;
 
-sinkpad = gst_element_get_static_pad (parser[0], "src");
+//sinkpad = gst_element_get_static_pad (parser[0], "src");
 
-gst_pad_add_probe (sinkpad, GST_PAD_PROBE_TYPE_PULL,
-      (GstPadProbeCallback) cb_probe, NULL, NULL);
+//gst_pad_add_probe (sinkpad, GST_PAD_PROBE_TYPE_PULL,
+ //     (GstPadProbeCallback) cb_probe, NULL, NULL);
 
     gst_pad_link (pad, sink_pad);
     link_to_mux(src_pad, mux);
