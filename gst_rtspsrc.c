@@ -102,8 +102,8 @@ cb_have_data (GstPad          *pad,
 
   gsize max,offset;
   gst_buffer_get_sizes(buffer,&offset,&max);
-
-printf("pts = %lld  dts=%lld  offset =%lld  max=%lld \n"  ,GST_BUFFER_PTS(buffer),GST_BUFFER_DTS(buffer), offset, max) ;
+  GST_BUFFER_DTS (buffer) = -1;
+//printf("pts = %lld  dts=%lld  offset =%lld  max=%lld \n"  ,GST_BUFFER_PTS(buffer),GST_BUFFER_DTS(buffer), offset, max) ;
 #if 0
   /* Making a buffer writable can fail (for example if it
    * cannot be copied and is used more than once)
@@ -284,7 +284,7 @@ main ()
   source   = gst_element_factory_make ("rtspsrc",  "dvb-source"); 
   //queue2   = gst_element_factory_make ("queue2",      "dvb-queue2");
  // demux    = gst_element_factory_make ("tsdemux",     "dvb-demux"); 
-  mux	  = gst_element_factory_make ("mpegtsmux",   "dvb-mux"); 
+  mux	  = gst_element_factory_make ("matroskamux",   "dvb-mux");
   queue    = gst_element_factory_make ("queue",       "dvb-queue");
   sink     = gst_element_factory_make ("filesink",    "file-output");
 
@@ -306,7 +306,7 @@ main ()
 //  g_object_set (G_OBJECT (source), "symbol-rate", 22000, NULL);
 
  // g_object_set (G_OBJECT (source), "async-handling", TRUE, NULL);
-  g_object_set (G_OBJECT (source), "location", "rtsp://127.0.0.1:8554/stream0","protocols", 0x00000004,NULL);
+  g_object_set (G_OBJECT (source), "location", "rtsp://127.0.0.1:8555/test","protocols", 0x00000004,NULL);
   g_object_set (G_OBJECT (sink), "location", "remux_test.ts", NULL); 
   g_object_set (G_OBJECT (sink), "sync", FALSE, NULL);
 
