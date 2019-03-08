@@ -117,7 +117,7 @@ typedef struct
 	GThread * gthread;
 	 GMutex sink_hash_mutex;
 	 GHashTable *sink_hashtable; //sink type, udp/rtp/tcp  // call_id
-     int pipeline_flag;
+     int pipeline_flag;   // only useful for rtspsrc as pipeline
 	 GMutex pipeline_mutex;  // used for rtsp distribute
 	//Sink *tcpsink;  // Only have 1 tcpsink
 	//char tcpclientsinkcallid[50];

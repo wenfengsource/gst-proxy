@@ -420,6 +420,17 @@ void cb_udp_client_remove  (GstElement* object, gchararray arg0, gint arg1, gpoi
 	printf("remove arg1 = %d \n", arg1);
 }
 
+void cb_queue_full(GstElement *queue, gpointer  user_data)
+{
+
+	//long long value=0, time=0, bytes=0, maxbuf=0,maxbyte=0,maxtime=0;
+//	g_object_get(queue,"current-level-buffers",&value,"current-level-time",&time,"current-level-bytes",&bytes,
+	//		"max-size-buffers",&maxbuf,"max-size-bytes",&maxbyte,"max-size-time",&maxtime);
+
+	//printf("queue is full %s  buffer= %u bytes =%u time=%u maxbuf=%u maxbyte=%u maxtime=%u \n",
+	//(char*)user_data ,value, bytes, time, maxbuf,maxbyte,maxtime);
+}
+
 //int tcp_client_remove(Sink *sink)
 //{
 //    ///GSocket *sock;
@@ -570,6 +581,13 @@ static void pad_added_handler_for_rtsp (GstElement *src, GstPad *new_pad, gpoint
        //	send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
        	g_mutex_unlock (&snd_data_mutex);
 
+       	//Disable audio, here is finished establish pipeline
+       	if(g_audio_codec!=CODEC_PCMULAW && g_audio_codec!=CODEC_AAC)
+       	{
+       		g_mutex_lock(&ptr->pipeline_mutex);
+			ptr->pipeline_flag = 1;
+			g_mutex_unlock(&ptr->pipeline_mutex);
+       	}
     }
     else
     {
@@ -637,17 +655,18 @@ cb_have_data1 (GstPad          *pad,
 {
   gint x, y;
   GstMapInfo map;
-  guint16 *ptr, t;
+//  guint16 *ptr, t;
   GstBuffer *buffer;
-
-
+  unsigned long offset, maxsize;
+  char *ptr = (char *)user_data;
   buffer = GST_PAD_PROBE_INFO_BUFFER (info);
 
   buffer = gst_buffer_make_writable (buffer);
 
-  // printf("pts = %lld  dts=%lld   \n"  ,GST_BUFFER_PTS(buffer),GST_BUFFER_DTS(buffer) ) ;
-  GST_BUFFER_DTS (buffer) = -1;
-  //printf("pts = %lld  dts=%lld   \n"  ,GST_BUFFER_PTS(buffer),GST_BUFFER_DTS(buffer) ) ;
+  //gst_buffer_get_sizes(buffer,&offset, &maxsize);
+  //printf("%s pts = %lld  dts=%lld size =%u  offset=%u maxsize=%u \n" ,ptr, GST_BUFFER_PTS(buffer),GST_BUFFER_DTS(buffer),//gst_buffer_get_size(buffer),offset,maxsize);
+   GST_BUFFER_DTS (buffer) = -1;
+  //printf("pts = %lld  dts=%lld   \n"  ,GST_BUFFER_PTS(buffer),GST_BUFFER_DTS(buffer)) ;
  // gsize max,offset;
   //gst_buffer_get_sizes(buffer,&offset,&max);
   return GST_PAD_PROBE_OK;
@@ -698,7 +717,7 @@ cb_have_data1 (GstPad          *pad,
 
 		g_object_set (gstcustom->source.src, "timeout",30000000000);   // 30s
 
-	 	g_object_set (gstcustom->source.src, "buffer-size",212992);   // 208KB  Set to Max value
+	 	g_object_set (gstcustom->source.src, "buffer-size",21299200);   // 208KB  Set to Max value
 
 		printf("gstcustom->sipuri = %s \n",gstcustom->sipuri);
 
@@ -811,7 +830,7 @@ cb_have_data1 (GstPad          *pad,
 				gstcustom->source.src = gst_element_factory_make ("rtspsrc", "rtspsrc");
 				gstcustom->source.h264depay = gst_element_factory_make ("rtpmp4vdepay", "rtpmp4vdepay");
 				gstcustom->source.h264parse = gst_element_factory_make ("mpeg4videoparse", "mpeg4videoparse");
-				gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
+				//gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
 				gstcustom->source.mpegtsmux = gst_element_factory_make ("mpegpsmux", "mpegpsmux");
 				gstcustom->source.tee = gst_element_factory_make ("tee", "tee");
 
@@ -824,16 +843,16 @@ cb_have_data1 (GstPad          *pad,
 				//	gstcustom->source.audiodepay = gst_element_factory_make ("rtppcmudepay", "rtppcmudepay");
 
 					if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
-									|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux || !gstcustom->source.rndbuffersize || !gstcustom->source.tee) {
+									|| !gstcustom->source.audiodepay || !gstcustom->source.mpegtsmux /*|| !gstcustom->source.rndbuffersize*/ || !gstcustom->source.tee) {
 									g_error ("Failed to create elements");
 									return -1;
 					}
 
 
 					gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,
-							gstcustom->source.aacparse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux, gstcustom->source.rndbuffersize, gstcustom->source.tee,NULL);
+							gstcustom->source.aacparse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux/*, gstcustom->source.rndbuffersize*/, gstcustom->source.tee,NULL);
 
-					if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.rndbuffersize,gstcustom->source.tee, NULL))
+					if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux/*, gstcustom->source.rndbuffersize*/,gstcustom->source.tee, NULL))
 					{
 						g_error ("Failed to link elements");
 						return -2;
@@ -859,8 +878,8 @@ cb_have_data1 (GstPad          *pad,
 			// printf("==========%s======%s \n", gstcustom->source.src_ip, tmp);
 			 printf("rtsp = %s \n", gstcustom->source.rtspaddr);
 			 g_object_set (gstcustom->source.src, "location",gstcustom->source.rtspaddr, NULL);
-			 g_object_set (gstcustom->source.rndbuffersize, "min",1316, NULL);
-			 g_object_set (gstcustom->source.rndbuffersize, "max",1316, NULL);
+		//	 g_object_set (gstcustom->source.rndbuffersize, "min",1316, NULL);
+		//	 g_object_set (gstcustom->source.rndbuffersize, "max",1316, NULL);
 
 			 if(g_rtsp_protocol == RTP_OVER_RTSP)
 			 {
@@ -883,17 +902,17 @@ cb_have_data1 (GstPad          *pad,
       		    sinkpad = gst_element_get_static_pad (gstcustom->source.h264parse, "src");
 
       		     gst_pad_add_probe (sinkpad, GST_PAD_PROBE_TYPE_BUFFER,
-      		           (GstPadProbeCallback) cb_have_data1, NULL, NULL);
+      		           (GstPadProbeCallback) cb_have_data1, "h264parse", NULL);
 
       		    gst_object_unref (sinkpad);
 
 
 				if(g_mux_type == MPEGPS)
 				{
-					gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
+				//	gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
 
-					 g_object_set (gstcustom->source.rndbuffersize, "min",1316, NULL);
-					 g_object_set (gstcustom->source.rndbuffersize, "max",1316, NULL);
+				//	 g_object_set (gstcustom->source.rndbuffersize, "min",1316, NULL);
+				//	 g_object_set (gstcustom->source.rndbuffersize, "max",1316, NULL);
 
 					gstcustom->source.mpegtsmux = gst_element_factory_make ("mpegpsmux", "mpegpsmux");
 				}
@@ -914,8 +933,8 @@ cb_have_data1 (GstPad          *pad,
 
 					sinkpad1 = gst_element_get_static_pad (gstcustom->source.aacparse, "src");
 
-					gst_pad_add_probe (sinkpad1, GST_PAD_PROBE_TYPE_BUFFER,
-						  (GstPadProbeCallback) cb_have_data1, NULL, NULL);
+					//gst_pad_add_probe (sinkpad1, GST_PAD_PROBE_TYPE_BUFFER,
+					//	  (GstPadProbeCallback) cb_have_data1, "aacparse", NULL);
 
 				    gst_object_unref (sinkpad1);
 
@@ -931,9 +950,9 @@ cb_have_data1 (GstPad          *pad,
                    if(g_mux_type == MPEGPS)
                    {
                 	   gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse,
-                	   							gstcustom->source.aacparse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux,gstcustom->source.rndbuffersize, gstcustom->source.tee,NULL);
+                	   							gstcustom->source.aacparse,gstcustom->source.audiodepay,gstcustom->source.mpegtsmux/*,gstcustom->source.rndbuffersize*/, gstcustom->source.tee,NULL);
 
-                	   if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux, gstcustom->source.rndbuffersize,gstcustom->source.tee, NULL))
+                	   if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux,/* gstcustom->source.rndbuffersize,*/gstcustom->source.tee, NULL))
 						{
 							g_error ("Failed to link elements");
 							return -2;
@@ -990,14 +1009,14 @@ cb_have_data1 (GstPad          *pad,
 					if(g_mux_type == MPEGPS)
 					{
 						if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.h264depay || !gstcustom->source.h264parse
-										  || !gstcustom->source.mpegtsmux || !gstcustom->source.rndbuffersize || !gstcustom->source.tee) {
+										  || !gstcustom->source.mpegtsmux /*|| !gstcustom->source.rndbuffersize*/ || !gstcustom->source.tee) {
 										g_error ("Failed to create elements");
 										return -1;
 						}
 
 
-						gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse ,gstcustom->source.mpegtsmux, gstcustom->source.rndbuffersize,gstcustom->source.tee,NULL);
-						if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux,gstcustom->source.rndbuffersize, gstcustom->source.tee, NULL))
+						gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src ,gstcustom->source.h264depay,gstcustom->source.h264parse ,gstcustom->source.mpegtsmux/*, gstcustom->source.rndbuffersize*/,gstcustom->source.tee,NULL);
+						if (!gst_element_link_many ( gstcustom->source.h264depay,gstcustom->source.h264parse,gstcustom->source.mpegtsmux/*,gstcustom->source.rndbuffersize*/, gstcustom->source.tee, NULL))
 						{
 							g_error ("Failed to link elements");
 							return -2;
@@ -1038,8 +1057,11 @@ cb_have_data1 (GstPad          *pad,
 				 g_object_set (gstcustom->source.src, "protocols",0x00000004, NULL);
 			 }
 
-			 g_object_set (gstcustom->source.h264parse, "config-interval",1, NULL);
-			 g_object_set (gstcustom->source.mpegtsmux, "alignment",7, NULL);
+			 g_object_set (gstcustom->source.h264parse, "config-interval",-1, NULL);
+
+			 if(g_mux_type == MPEGTS){
+				 g_object_set (gstcustom->source.mpegtsmux, "alignment",7, NULL);
+			 }
 
 			}
 
@@ -1049,7 +1071,7 @@ cb_have_data1 (GstPad          *pad,
 		    sinkpad = gst_element_get_static_pad (gstcustom->source.h264parse, "src");
 
 		    gst_pad_add_probe (sinkpad, GST_PAD_PROBE_TYPE_BUFFER,
-		          (GstPadProbeCallback) cb_have_data1, NULL, NULL);
+		          (GstPadProbeCallback) cb_have_data1, "h264parse", NULL);
 
 
 	}
@@ -1081,8 +1103,8 @@ cb_have_data1 (GstPad          *pad,
 			}
 			else
 			{
-				if(gstcustom->sink->src_port != 0)
-				g_object_set (gstcustom->sink->sink, "bind-address",LOCAL_IP,"bind-port",gstcustom->sink->src_port, NULL);
+				//if(gstcustom->sink->src_port != 0)
+				//g_object_set (gstcustom->sink->sink, "bind-address",LOCAL_IP,"bind-port",gstcustom->sink->src_port, NULL);
 			}
 
 			g_object_set (gstcustom->sink->sink, "send-duplicates", FALSE, NULL);
@@ -1092,8 +1114,11 @@ cb_have_data1 (GstPad          *pad,
 
 			g_signal_emit_by_name (gstcustom->sink->sink, "add", gstcustom->sink->dst_ip, gstcustom->sink->dst_port, NULL);
 
-			//g_object_set (gstcustom->sink->sink, "buffer-size", 10240, NULL);
-
+			g_object_set (gstcustom->sink->sink, "buffer-size", 21299200, NULL);
+			if(gstcustom->source.type == RTSP)
+			{
+				g_object_set (gstcustom->sink->sink, "udp-interval", 50, NULL);
+			}
 			printf("gstcustom->sink.dst_ip %s gstcustom->sink.dst_port = %d \n",  gstcustom->sink->dst_ip, gstcustom->sink->dst_port);
 
 	    }
@@ -1139,9 +1164,10 @@ cb_have_data1 (GstPad          *pad,
 		 	g_object_set (gstcustom->sink->sink, "block", FALSE ,NULL);
 		}
 
-	    g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);  // buffer leak data
-
-	     g_object_set (gstcustom->sink->sink, "sync", FALSE ,NULL);
+	   // g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);  // buffer leak data
+	  // g_object_set (gstcustom->sink->queue, "max-size-bytes", 1024*1024*10,"max-size-time",2000000000,"max-size-buffers",1000, NULL);
+        g_signal_connect (gstcustom->sink->queue, "overrun",G_CALLBACK (cb_queue_full), gstcustom->callid);
+	    g_object_set (gstcustom->sink->sink, "sync", FALSE ,NULL);
 	   //  g_object_set (gstcustom->sink->sink, "max-lateness", 20000000 ,NULL);
 
        // gst_bin_add_many (GST_BIN (gstcustom->pipeline), gst_object_ref (gstcustom->sink->queue),gst_object_ref (gstcustom->sink->sink), NULL);
@@ -2273,7 +2299,7 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  				g_error ("Failed to create elements");
  				return -1;
  			}
- 			g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);
+ 			//g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);
 
  			g_object_set (gstcustom->sink->sink, "timeout", 20000000000, NULL);  // client is not inactivity timeout: 20s
  			g_object_set (gstcustom->sink->sink, "client-connect-timeout", 10, NULL); // client connect timeout : 10s
@@ -2296,7 +2322,7 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  				g_error ("Failed to create elements");
  				return -1;
  			}
- 			g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);
+ 			//g_object_set (gstcustom->sink->queue, "leaky", 1, NULL);
 
  			g_object_set (gstcustom->sink->sink, "host", gstcustom->sink->dst_ip, NULL);
  			g_object_set (gstcustom->sink->sink, "port", gstcustom->sink->dst_port , NULL);
@@ -2332,10 +2358,15 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  				g_object_set (sink->sink, "close-socket",  FALSE , NULL);    //set element to NULL, not close socket
  			}
 
- 			g_object_set (sink->queue, "leaky", 1, NULL);
+ 			//g_object_set (sink->queue, "leaky", 1, NULL);
 
  			g_object_set (sink->sink, "send-duplicates", FALSE, NULL);
- 			//g_object_set (sink->sink, "buffer-size", 10240, NULL);
+ 			g_object_set (sink->sink, "buffer-size", 21299200, NULL);
+
+ 			if(gstcustom->source.type == RTSP)
+			{
+				g_object_set (gstcustom->sink->sink, "udp-interval", 50, NULL);
+			}
 
  			g_signal_connect (sink->sink, "client-added",G_CALLBACK (cb_udp_client_add), gstcustom);
  			g_signal_connect (sink->sink, "client-removed",G_CALLBACK (cb_udp_client_remove), gstcustom);
@@ -2344,6 +2375,8 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
 
  			printf("gstcustom->sink->dst_ip %s gstcustom->sink->dst_port = %d \n", sink->dst_ip, sink->dst_port);
  	    }
+      //  g_object_set (gstcustom->sink->queue, "max-size-bytes", 1024*1024*10,"max-size-time",2000000000,"max-size-buffers",1000, NULL); // 10M 2S
+		g_signal_connect (gstcustom->sink->queue, "overrun",G_CALLBACK (cb_queue_full), sink->callid);
 
  	    g_object_set (sink->sink, "sync", FALSE ,NULL);
  	  //  g_object_set (gstcustom->sink->sink, "max-lateness", 20000000 ,NULL);
