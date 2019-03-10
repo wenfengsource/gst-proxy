@@ -93,8 +93,9 @@ GMainLoop* loop;
 
 GstCustom gstdata;
 
-GHashTable *gsthashtbale;
+GHashTable *gstHashtable;
 GHashTable *hashRtspServerUri;
+GHashTable *gHashtableUdpDstUrl;
 static GMutex gst_mutex;
 static GMutex snd_data_mutex;
 static GMutex tcpclienthash_mutex;
@@ -754,25 +755,26 @@ cb_have_data1 (GstPad          *pad,
 	{
 			gstcustom->source.src = gst_element_factory_make ("tcpclientsrc", "tcpclientsrc");
 			gstcustom->source.tee = gst_element_factory_make ("tee", "tee");
-			//gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
+			gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
 			gstcustom->source.capsfilter = gst_element_factory_make ("capsfilter", "capsfilter");
 
-			if (!gstcustom->pipeline || !gstcustom->source.src || /*!gstcustom->source.rndbuffersize ||*/ !gstcustom->source.capsfilter || !gstcustom->source.tee) {
+			if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.rndbuffersize || !gstcustom->source.capsfilter || !gstcustom->source.tee) {
 				g_error ("Failed to create elements");
 				return -1;
 			}
 
-
+            // PS  caps is not correct
+			// ToDo
 			//g_object_set (src, "caps", gst_caps_new_simple("application/x-rtp", "media", G_TYPE_STRING,"video","payload",G_TYPE_INT,33, NULL), NULL);
 			g_object_set (gstcustom->source.capsfilter , "caps", gst_caps_new_simple("video/mpegts", "packetsize",G_TYPE_INT,188, NULL), NULL);
 
 
-			gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src/*,gstcustom->source.rndbuffersize*/,gstcustom->source.capsfilter, gstcustom->source.tee,NULL);
-		if (!gst_element_link_many (gstcustom->source.src,/*gstcustom->source.rndbuffersize,*/gstcustom->source.capsfilter, gstcustom->source.tee, NULL))
-		{
-			g_error ("Failed to link elements");
-			return -2;
-		}
+			gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src,gstcustom->source.rndbuffersize,gstcustom->source.capsfilter, gstcustom->source.tee,NULL);
+			if (!gst_element_link_many (gstcustom->source.src,gstcustom->source.rndbuffersize,gstcustom->source.capsfilter, gstcustom->source.tee, NULL))
+			{
+				g_error ("Failed to link elements");
+				return -2;
+			}
 
 
 			g_object_set (gstcustom->source.src, "port", gstcustom->source.src_port,NULL);
@@ -784,16 +786,19 @@ cb_have_data1 (GstPad          *pad,
 			g_object_set (gstcustom->source.src, "bindip", LOCAL_IP ,NULL); // read data time-out
 			g_object_set (gstcustom->source.src, "bindport", gstcustom->source.dst_port ,NULL);
 
+			g_object_set (gstcustom->source.rndbuffersize, "min",1316, NULL);
+			g_object_set (gstcustom->source.rndbuffersize, "max",1316, NULL);
+
 	}
 
 	else if(gstcustom->source.type == TCPSERVER)
 	{
 			gstcustom->source.src = gst_element_factory_make ("tcpserversrc", "tcpserversrc");
 			gstcustom->source.tee = gst_element_factory_make ("tee", "tee");
-		//	gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
+			gstcustom->source.rndbuffersize = gst_element_factory_make ("rndbuffersize", "rndbuffersize");
 			gstcustom->source.capsfilter = gst_element_factory_make ("capsfilter", "capsfilter");
 
-			if (!gstcustom->pipeline || !gstcustom->source.src || /*!gstcustom->source.rndbuffersize ||*/ !gstcustom->source.capsfilter || !gstcustom->source.tee) {
+			if (!gstcustom->pipeline || !gstcustom->source.src || !gstcustom->source.rndbuffersize || !gstcustom->source.capsfilter || !gstcustom->source.tee) {
 				g_error ("Failed to create elements");
 				return -1;
 			}
@@ -803,8 +808,8 @@ cb_have_data1 (GstPad          *pad,
 			g_object_set (gstcustom->source.capsfilter , "caps", gst_caps_new_simple("video/mpegts", "packetsize",G_TYPE_INT,188, NULL), NULL);
 
 
-			gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src/*,gstcustom->source.rndbuffersize*/,gstcustom->source.capsfilter, gstcustom->source.tee,NULL);
-		if (!gst_element_link_many (gstcustom->source.src,/*gstcustom->source.rndbuffersize,*/gstcustom->source.capsfilter, gstcustom->source.tee, NULL))
+			gst_bin_add_many (GST_BIN (gstcustom->pipeline), gstcustom->source.src,gstcustom->source.rndbuffersize,gstcustom->source.capsfilter, gstcustom->source.tee,NULL);
+		if (!gst_element_link_many (gstcustom->source.src,gstcustom->source.rndbuffersize,gstcustom->source.capsfilter, gstcustom->source.tee, NULL))
 		{
 			g_error ("Failed to link elements");
 			return -2;
@@ -820,7 +825,8 @@ cb_have_data1 (GstPad          *pad,
 			//g_object_set (gstcustom->source.src, "timeout", 10 ,NULL); // read data time-out
 			g_object_set (gstcustom->source.src, "timeout",40);
 
-
+			 g_object_set (gstcustom->source.rndbuffersize, "min",1316, NULL);
+		 	 g_object_set (gstcustom->source.rndbuffersize, "max",1316, NULL);
 	}
 	else if(gstcustom->source.type == RTSP)
 	{
@@ -878,8 +884,7 @@ cb_have_data1 (GstPad          *pad,
 			// printf("==========%s======%s \n", gstcustom->source.src_ip, tmp);
 			 printf("rtsp = %s \n", gstcustom->source.rtspaddr);
 			 g_object_set (gstcustom->source.src, "location",gstcustom->source.rtspaddr, NULL);
-		//	 g_object_set (gstcustom->source.rndbuffersize, "min",1316, NULL);
-		//	 g_object_set (gstcustom->source.rndbuffersize, "max",1316, NULL);
+
 
 			 if(g_rtsp_protocol == RTP_OVER_RTSP)
 			 {
@@ -1243,6 +1248,20 @@ gboolean rtsp_uri_callid_remove(gpointer key,gpointer value,gpointer user_data)
 		return 0;
 }
 
+gboolean udpDestUrl_remove(gpointer key,gpointer value,gpointer user_data)
+{
+	callidSipUri *ptr = (callidSipUri*)value;
+	if(ptr->sipuri == value)
+	{
+
+
+
+		return 1;
+	}
+
+		return 0;
+}
+
 static void media_prepared_cb (GstRTSPMedia * media)
 {
   guint i, n_streams;
@@ -1283,7 +1302,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 		char sipuri[100], sink_dst_uri[30], sink_dst_ip[20], sink_src_ip[20], source_src_ip[20],source_dst_ip[20];
 		char gst_hashtable_key[100],  callid[100], rtspaddr[100];
         char rtsp_server_uri[30];
-
+         int NoRemoveUdpDstUrlFlag = 0;
 		 printf("waitting data.... \n");
 		 memset(rx_buf, 0 ,1500);
 
@@ -1299,19 +1318,18 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 		}
 
 		g_mutex_lock (&gst_mutex);
-		if(get_total_session(rx_buf,rcv_size) == 1 && gsthashtbale !=NULL)
+		if(get_total_session(rx_buf,rcv_size) == 1 && gstHashtable !=NULL)
 		{
 			cnt = 0;
 			g_mutex_lock (&snd_data_mutex);
 			bzero(tx_buf,sizeof(tx_buf));
-			g_hash_table_foreach(gsthashtbale, foreach_gst_hashtab, NULL);
+			g_hash_table_foreach(gstHashtable, foreach_gst_hashtab, NULL);
 
 			printf("tx_buf  %s \n", tx_buf);
 			send_packet(tx_buf, strlen(tx_buf), g_remote_ip,SND_PORT) ;
 			g_mutex_unlock (&snd_data_mutex);
 		}
 		g_mutex_unlock (&gst_mutex);
-
 
 		//printf("sipuri = %s \n", sipuri);
 		memset(callid, 0 ,100);
@@ -1526,6 +1544,10 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 		invite_flag = invite_parse(rx_buf, rcv_size);
 		bye_flag    =  bye_parse(rx_buf, rcv_size);
 
+		if(bye_flag ==1)
+		{
+			NoRemoveUdpDstUrlFlag = notRemoveUdpDstUrl(rx_buf, rcv_size);
+		}
 		sink_src_port =  sink_src_port_parse(rx_buf, rcv_size);
 		sink_dst_port =  sink_dst_port_parse(rx_buf, rcv_size);
 //		if(sink_dst_port ==0)
@@ -1587,6 +1609,8 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 			g_mutex_unlock (&snd_data_mutex);
 			//printf("tx_buf -----%s \n", tx_buf);
 
+			 printf("current gstHashtable size =%d \n", g_hash_table_size (gstHashtable));
+
 			// sink_type == rtsp , force sink_type convert to udp type
 			 if(sink_type == RTSP)
 			 {
@@ -1646,6 +1670,34 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 				 }
 			 }
 
+			if(sink_type == UDP)
+			{
+
+				 char destUrl[30] = {0};
+				 sprintf(destUrl,"%s:%d",sink_dst_ip,sink_dst_port);
+				 callidSipUri *ptr = g_hash_table_lookup (gHashtableUdpDstUrl, destUrl);
+				 if(ptr != NULL)
+				 {
+					 printf("the same UdpdstUrl %s \n",destUrl);
+					 bzero(tx_buf,sizeof(tx_buf));
+					 sprintf(tx_buf, "self;callid=%s;sipuri=%s;bye=ok;notremoveUdpDstUrl=ok",ptr->callid, ptr->sipuri);
+
+					 send_packet(tx_buf,strlen(tx_buf),"0.0.0.0",LISTEN_PORT);
+
+				 }
+			//	 else
+				 {
+					 printf("inset gHashtableUdpDstUrl key %s \n", destUrl);
+					 callidSipUri *pcallidSipUri = g_new0(callidSipUri,1);
+					 g_stpcpy(pcallidSipUri->sipuri,sipuri);
+					 g_stpcpy(pcallidSipUri->callid,callid);
+
+					 g_hash_table_insert (gHashtableUdpDstUrl,g_strdup(destUrl), pcallidSipUri);
+					 //printf("gHashtableUdpDstUrl size = %d \n",g_hash_table_size (gHashtableUdpDstUrl));
+				 }
+
+			}
+
 			switch(src_type)
 			{
 
@@ -1655,13 +1707,13 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 			{
 				//sprintf(gst_hashtable_key,"udp://%s",src_uri);
 				g_mutex_lock (&gst_mutex);
-				GstCustom *tmp = g_hash_table_lookup (gsthashtbale, callid);
+				GstCustom *tmp = g_hash_table_lookup (gstHashtable, callid);
 				g_mutex_unlock (&gst_mutex);
 
 
 				if(tmp != 0)  // src session id is esstibition
 				{
-					printf("src session callid id= %s is esstibition \n",callid);
+					printf("src session callid id= %s is established \n",callid);
 				}
 				else     // src session is not build, create new pipeline
 				{
@@ -1692,7 +1744,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 
 						// sprintf(gst_ptr->source.src_uri,"udp://%s",src_uri);
 						 g_mutex_lock (&gst_mutex);
-						 g_hash_table_insert (gsthashtbale,  g_strdup(gst_ptr->callid), gst_ptr);
+						 g_hash_table_insert (gstHashtable,  g_strdup(gst_ptr->callid), gst_ptr);
 						 g_mutex_unlock (&gst_mutex);
 
 						 g_stpcpy(gst_ptr->sink->src_ip, sink_src_ip);
@@ -1722,7 +1774,6 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 						 gst_ptr->sink->keep_alive_flag = sink_keep_alive_flag;
 						 gst_ptr->source.keep_alive_flag = source_keep_alive_flag;
 						 create_keep_alive_socket_for_sink(gst_ptr->sink);
-
 
 						if(sink_type == TCPCLIENT)
 						{	
@@ -1798,7 +1849,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 			{
 				//sprintf(gst_hashtable_key,"udp://%s",src_uri);
 				g_mutex_lock (&gst_mutex);
-				GstCustom *tmp = g_hash_table_lookup (gsthashtbale,  sipuri);
+				GstCustom *tmp = g_hash_table_lookup (gstHashtable,  sipuri);
 				g_mutex_unlock (&gst_mutex);
 
 				if(tmp != 0)  // src session id is esstibition
@@ -1901,7 +1952,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 						 g_stpcpy(gst_ptr->sipuri, sipuri);
 						// sprintf(gst_ptr->source.src_uri,"udp://%s",src_uri);
 						 g_mutex_lock (&gst_mutex);
-						 g_hash_table_insert (gsthashtbale,  g_strdup(gst_ptr->sipuri), gst_ptr);
+						 g_hash_table_insert (gstHashtable,  g_strdup(gst_ptr->sipuri), gst_ptr);
 						 g_mutex_unlock (&gst_mutex);
 
 						 g_stpcpy(gst_ptr->sink->src_ip, sink_src_ip);
@@ -1964,9 +2015,8 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
                 GstCustom *tmp;
 
 				g_mutex_lock (&gst_mutex);
-				tmp = g_hash_table_lookup (gsthashtbale, callid);
+				tmp = g_hash_table_lookup (gstHashtable, callid);
 				g_mutex_unlock (&gst_mutex);
-
 
 				g_hash_table_foreach_remove (hashRtspServerUri,rtsp_uri_callid_remove, callid);
 
@@ -1974,14 +2024,28 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 				{
 					 char *ptr=NULL;
 
-					//g_mutex_lock (&source_rcv_port_mutex);
-					//ptr = g_hash_table_lookup(Hashtbl_Udp_Source_rcv_port ,tmp->callid);
-					//g_mutex_unlock (&source_rcv_port_mutex);
+					 if(NoRemoveUdpDstUrlFlag !=1 && tmp->sink->type == UDP )
+					 {
+						char udpdesturi[30] ={ 0};
+						 sprintf(udpdesturi, "%s:%d",tmp->sink->dst_ip,tmp->sink->dst_port);
+						 if(g_hash_table_remove(gHashtableUdpDstUrl,udpdesturi))
+						 {
+							 printf("remove the gHashtableUdpDstUrl %s \n",udpdesturi);
+						 }
+
+						 printf("gHashtableUdpDstUrl size = %d \n",g_hash_table_size (gHashtableUdpDstUrl));
+					 }
 
 					 g_mutex_lock (&snd_data_mutex);
 					 sprintf(tx_buf,"code=1002;sipuri=%s;callid=%s;port=%d;",tmp->sipuri,tmp->callid,tmp->source.dst_port);
 					 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 					 g_mutex_unlock (&snd_data_mutex);
+
+                    if(tmp->pipeline == NULL)
+                    {
+                    	printf("tmp->pipeline is null \n");
+                    	continue;
+                    }
 
 					gst_element_set_state(GST_ELEMENT (tmp->pipeline),GST_STATE_NULL);
 					usleep(5000); // solve bugs for tcp connect fail, can't quit the loop
@@ -1994,27 +2058,11 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 					gst_bus_remove_signal_watch(tmp->bus);
 					gst_object_unref (GST_OBJECT (tmp->bus));
 
-//					if(tmp->sink->type == UDP && tmp->sink->dst_port >=1600 && tmp->sink->dst_port < 1600 + g_rtsp_channel_max_cnt)
-//					{
-//						char key[10];
-//						bzero(key,sizeof(key));
-//						sprintf(key,"/stream%d",tmp->sink->dst_port- 1600);
-//						if(g_hash_table_remove(hashRtspServerUri,key))
-//						{
-//							// remove rtsp client
-//						 	gst_rtsp_server_client_filter (server,ClientFilterFunc, key);
-//						 	mounts = gst_rtsp_server_get_mount_points (server);
-//						 	gst_rtsp_mount_points_remove_factory (mounts, key);
-//							printf("hashRtspServerUri remove stream%d  \n",(tmp->sink->dst_port - 1600));
-//							 g_object_unref (mounts);
-//						}
-//
-//					}
 
 					g_mutex_lock (&gst_mutex);
-					if(g_hash_table_remove(gsthashtbale,tmp->callid))
+					if(g_hash_table_remove(gstHashtable,tmp->callid))
 					{
-						printf("remove session from gsthashtbale of callid %s  \n", tmp->callid);
+						printf("remove session from gstHashtable of callid %s  \n", tmp->callid);
 					}
 					g_mutex_unlock (&gst_mutex);
 
@@ -2027,7 +2075,7 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 				}
 				// rtsp distribute
 				g_mutex_lock (&gst_mutex);
-				tmp = g_hash_table_lookup (gsthashtbale, sipuri);
+				tmp = g_hash_table_lookup (gstHashtable, sipuri);
 				g_mutex_unlock (&gst_mutex);
 
 				if(tmp != NULL)
@@ -2038,8 +2086,20 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 					sink = g_hash_table_lookup (tmp->sink_hashtable, callid);
 					g_mutex_unlock (&tmp->sink_hash_mutex);
 					// found callid from sink_hashtable
+
 				    if(sink != NULL)
 					{
+				    	 if(NoRemoveUdpDstUrlFlag !=1 && sink->type == UDP )
+						 {
+							char udpdesturi[30] ={ 0};
+							 sprintf(udpdesturi, "%s:%d",sink->dst_ip,sink->dst_port);
+							 if(g_hash_table_remove(gHashtableUdpDstUrl,udpdesturi))
+							 {
+								 printf("remove the gHashtableUdpDstUrl %s \n",udpdesturi);
+							 }
+
+							 printf("gHashtableUdpDstUrl size = %d \n",g_hash_table_size (gHashtableUdpDstUrl));
+						 }
 
 						tmp->sink = sink;
 						if(sink != NULL)
@@ -2051,7 +2111,10 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 
 								printf("sink address %p callid %s \n",sink,sink->callid);
 								//printf("sink tee pad address =%p ,callid =%s\n", sink->teepad, callid);
-								 gst_pad_add_probe (sink->teepad, GST_PAD_PROBE_TYPE_IDLE, unlink_cb, tmp,NULL);
+								 if(sink->teepad != NULL)
+								 {
+								    gst_pad_add_probe (sink->teepad, GST_PAD_PROBE_TYPE_IDLE, unlink_cb, tmp,NULL);
+								 }
 
 								 g_mutex_lock (&snd_data_mutex);
 								 bzero(tx_buf,sizeof(tx_buf));
@@ -2073,6 +2136,11 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 								 send_packet(tx_buf,strlen(tx_buf),g_remote_ip,SND_PORT);
 								 g_mutex_unlock (&snd_data_mutex);
 
+								 if(tmp->pipeline == NULL)
+								 {
+									 printf("tmp->pipeline is null \n");
+									 continue;
+								 }
 								gst_element_set_state(GST_ELEMENT (tmp->pipeline),GST_STATE_NULL);
 								usleep(5000); // solve bugs for tcp connect fail, can't quit the loop
 								printf("set status to NUll \n");
@@ -2088,9 +2156,9 @@ static void media_configure_cb (GstRTSPMediaFactory * factory, GstRTSPMedia * me
 
 							//printf("queue value =%d \n" ,GST_OBJECT_REFCOUNT_VALUE(sink->queue));
 								g_mutex_lock (&gst_mutex);
-								if(g_hash_table_remove(gsthashtbale,tmp->sipuri))
+								if(g_hash_table_remove(gstHashtable,tmp->sipuri))
 								{
-									printf("remove sipuri %s from gsthashtbale  \n", tmp->sipuri);
+									printf("remove sipuri %s from gstHashtable  \n", tmp->sipuri);
 								}
 								g_mutex_unlock (&gst_mutex);
 
@@ -2279,6 +2347,10 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
 
  	printf("Linksink_to_pipeline sipuri\n",gstcustom->sipuri);
 
+ 	if(gstcustom->source.tee == NULL)
+ 	{
+ 		return -1;
+ 	}
  	 templ =
  	        gst_element_class_get_pad_template (GST_ELEMENT_GET_CLASS (gstcustom->source.tee),
  	        "src_%u");
@@ -2424,7 +2496,7 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
 
 	g_main_loop_run (gstdata->loop);
 
-	 printf("exit loop ===    \n"   );
+	 printf("exit loop %s    \n"  ,gstdata->callid );
 
 	//gst_element_set_state (gstdata->pipeline, GST_STATE_NULL);
 	//g_main_loop_quit (gstdata->loop);
@@ -2674,7 +2746,7 @@ keep_alive_timed_out_cb (GSocket      *client,
 	 if(sink->sourceid !=0)
 	 {
 		 printf("remove sink->sourceid %d \n ",sink->sourceid);
-		 g_source_remove( sink->sourceid);
+		 g_source_remove(sink->sourceid);
 		 sink->sourceid = 0;
 	 }
 
@@ -2832,9 +2904,10 @@ int  main (int argc, char **argv)
 
 	//int err;
 	gst_init (&argc, &argv);
-     loop = g_main_loop_new (NULL, FALSE);
+    loop = g_main_loop_new (NULL, FALSE);
+    gHashtableUdpDstUrl = g_hash_table_new_full (g_str_hash , g_str_equal ,free_UdpDstUrlkey,  free_udpDstUrlValue); // key desturl  value callidSipUri
 
-    gsthashtbale = g_hash_table_new_full (g_str_hash , g_str_equal ,free_sipuri_key,  free_sipuri_value);
+    gstHashtable = g_hash_table_new_full (g_str_hash , g_str_equal ,free_sipuri_key,  free_sipuri_value);
     hashRtspServerUri = g_hash_table_new_full (g_str_hash , g_str_equal ,free_key,  free_value);
 
 

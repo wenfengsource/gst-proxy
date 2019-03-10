@@ -49,6 +49,22 @@ void * free_key (gpointer data)
  // printf ("freeing KEY %p\n", data);
 }
 
+void * free_udpDstUrlValue (gpointer data)
+{
+	//printf ("freeing value: %s %p\n", (char *) data, data);
+  g_free (data);
+ // data = NULL;
+ // printf ("freeing VALUE %p\n", data);
+}
+
+void * free_UdpDstUrlkey (gpointer data)
+{
+  printf ("freeing udpDstUrl: %s %p\n", (char *) data, data);
+  g_free (data);
+  //data = NULL;
+ // printf ("freeing KEY %p\n", data);
+}
+
 void * free_udp_rcv_port_key (gpointer data)
 {
   printf ("free_udp_rcv_port_key: %s %p\n", (char *) data, data);

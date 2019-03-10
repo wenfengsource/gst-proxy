@@ -31,6 +31,13 @@
 //	char callid[100];
 //}SinkAddress;
 //
+typedef struct
+{
+	char callid[100];
+
+	char sipuri[100];
+
+} callidSipUri;
 
 typedef struct
 {

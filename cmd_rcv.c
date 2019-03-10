@@ -1191,6 +1191,22 @@ int bye_parse(char *buff, int len)
 	return 0;
 }
 
+
+int notRemoveUdpDstUrl(char *buff, int len)
+{
+	int i=0, j=0;
+	int cnt;
+	//char type[3];
+	int flag =0;
+	char type[2];
+	//memset(type,0,3);
+	if(strstr(buff,"notremoveUdpDstUrl=ok"))
+	{
+		return 1;
+	}
+	return 0;
+}
+
 int Nat_parse(char *buff, int len)
 {
 	int i=0, j=0;
