@@ -1108,8 +1108,8 @@ cb_have_data1 (GstPad          *pad,
 			}
 			else
 			{
-				//if(gstcustom->sink->src_port != 0)
-				//g_object_set (gstcustom->sink->sink, "bind-address",LOCAL_IP,"bind-port",gstcustom->sink->src_port, NULL);
+				if(gstcustom->sink->src_port != 0)
+				g_object_set (gstcustom->sink->sink, "bind-address",LOCAL_IP,"bind-port",gstcustom->sink->src_port, NULL);
 			}
 
 			g_object_set (gstcustom->sink->sink, "send-duplicates", FALSE, NULL);
@@ -2415,7 +2415,8 @@ void free_all_keepalive_for_sink(gpointer key, gpointer value, gpointer user_dat
  			sink->queue = gst_element_factory_make ("queue", sink->callid);
  			sink->sink = gst_element_factory_make ("multiudpsink", tmp);
 
- 		//	g_object_set (sink->sink, "bind-address",sink->src_ip,"bind-port",sink->src_port, NULL);
+            if(sink->src_port !=0)
+ 		 	g_object_set (sink->sink, "bind-address",sink->src_ip,"bind-port",sink->src_port, NULL);
 
  			//   gst_object_unref(templ);
  			//    port += 1;
